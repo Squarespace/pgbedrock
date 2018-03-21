@@ -7,7 +7,8 @@ POSTGRES_USER = test_user
 POSTGRES_PASSWORD = test_password
 
 FULL_NAME := quay.io/squarespace/pgbedrock
-VERSION := `cat package_version`
+VERSION := `grep "^__version__" pgbedrock/__init__.py | cut -d "'" -f 2`
+
 
 attach:
 	@docker run -it --entrypoint "/bin/bash" pgbedrock
