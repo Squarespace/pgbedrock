@@ -1,4 +1,4 @@
-.PHONY: attach build build_tester clean coverage create_network psql release_pypi release_quay remove_network start_postgres stop_postgres test test27 test36 wait_for_postgres
+.PHONY: attach build build_tester clean coverage create_network psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test27 test36 wait_for_postgres
 
 COMPOSED_NETWORK = pgbedrock_network
 POSTGRES_HOST = pgbedrock_postgres
@@ -50,11 +50,15 @@ psql:
 
 release_pypi: test
 	@echo "Releasing Python package to pypi"
-	python setup.py sdist upload -r pypi
+	rm -rf dist/
+	python setup.py sdist bdist_wheel upload -r pypi
+	rm -rf dist/
 
 release_pypitest: test
 	@echo "Releasing Python package to pypitest"
-	python setup.py sdist upload -r pypitest
+	rm -rf dist/
+	python setup.py sdist bdist_wheel upload -r pypitest
+	rm -rf dist/
 
 # Note: you may have to do a `docker login` and/or be added to the
 # admin users for the docker repo before quay will accept a push
