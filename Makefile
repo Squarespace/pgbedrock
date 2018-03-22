@@ -52,6 +52,10 @@ release_pypi: test
 	@echo "Releasing Python package to pypi"
 	python setup.py sdist upload -r pypi
 
+release_pypitest: test
+	@echo "Releasing Python package to pypitest"
+	python setup.py sdist upload -r pypitest
+
 # Note: you may have to do a `docker login` and/or be added to the
 # admin users for the docker repo before quay will accept a push
 release_quay: test build
