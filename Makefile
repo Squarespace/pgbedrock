@@ -18,6 +18,7 @@ build: clean
 	docker build \
 		-t $(FULL_NAME) \
 		-t $(FULL_NAME):$(VERSION) \
+		-t $(FULL_NAME):latest \
         .
 
 build_tester:
@@ -65,6 +66,7 @@ release_pypitest: test
 release_quay: test build
 	@echo "Releasing docker image to quay"
 	docker push $(FULL_NAME):$(VERSION)
+	docker push $(FULL_NAME):latest
 
 remove_network: stop_postgres
 	@echo "Removing the docker network (if it exists)"
