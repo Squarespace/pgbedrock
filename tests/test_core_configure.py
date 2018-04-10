@@ -25,13 +25,13 @@ def set_envvar(request):
 def test_load_spec(tmpdir):
     spec_path = tmpdir.join('spec.yml')
     spec_path.write("""
-        - name: fred
+        fred:
           can_login: yes
 
-        - name: my_group
+        my_group:
           can_login: no
 
-        - name: admin
+        admin:
           can_login: yes
           is_superuser: yes
           options:
@@ -39,7 +39,7 @@ def test_load_spec(tmpdir):
               - CREATEROLE
               - REPLICATION
 
-        - name: service1
+        service1:
           can_login: yes
           schemas:
               - service1_schema
@@ -47,23 +47,21 @@ def test_load_spec(tmpdir):
     spec = core_configure.load_spec(spec_path.strpath)
 
     assert len(spec) == 4
-
-    diff = {i['name'] for i in spec}.symmetric_difference({'admin', 'my_group', 'service1', 'fred'})
-    assert len(diff) == 0
+    assert set(spec.keys()) == {'admin', 'my_group', 'service1', 'fred'}
 
 
 @pytest.mark.parametrize('set_envvar', [('FRED_PASSWORD', 'a_password')], indirect=True)
 def test_load_spec_with_templated_variables(tmpdir, set_envvar):
     spec_path = tmpdir.join('spec.yml')
     spec_path.write("""
-        - name: fred
+        fred:
           can_login: yes
           options:
             - PASSWORD: "{{ env['FRED_PASSWORD'] }}"
     """)
     spec = core_configure.load_spec(spec_path.strpath)
 
-    password_option = spec[0]['options'][0]
+    password_option = spec['fred']['options'][0]
     assert password_option['PASSWORD'] == 'a_password'
 
 
@@ -72,7 +70,7 @@ def test_load_spec_fails_missing_templated_envvars(capsys, tmpdir):
     assert envvar_name not in os.environ
 
     spec = """
-        - name: fred
+        fred:
           can_login: yes
           options:
             - PASSWORD: "{{ env['%s'] }}"
