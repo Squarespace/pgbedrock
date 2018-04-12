@@ -418,7 +418,12 @@ Running `make coverage` will show code coverage.
 
 ## Releasing A New Version
 Once your PR has been merged into master:
-1. Increment the __version__ in the pgbedrock/__init__.py file and push a new git tag to the repo.
+1. Increment the __version__ in the pgbedrock/__init__.py file and commit that change.
+2. Push a new git tag to the repo by doing:
+    * Write the tag message in a dummy file called `tag_message`. We do this to allow multi-line tag
+      messages
+    * `git tag x.x.x -F tag_message`
+    * `git push --tags origin master`
 2. Run `make release-pypi`.
 3. Run `make release-quay`. This may require doing a docker login to quay first.
 
