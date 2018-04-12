@@ -22,7 +22,7 @@ def set_envvar(request):
     del os.environ[k]
 
 
-def test_load_spec(tmpdir):
+def test_render_template(tmpdir):
     spec_path = tmpdir.join('spec.yml')
     spec_path.write("""
         fred:
@@ -44,7 +44,8 @@ def test_load_spec(tmpdir):
           schemas:
               - service1_schema
     """)
-    spec = core_configure.load_spec(spec_path.strpath)
+    spec = core_configure.render_template(spec_path.strpath)
+    spec = yaml.load(spec)
 
     assert len(spec) == 4
     assert set(spec.keys()) == {'admin', 'my_group', 'service1', 'fred'}
@@ -59,7 +60,8 @@ def test_load_spec_with_templated_variables(tmpdir, set_envvar):
           options:
             - PASSWORD: "{{ env['FRED_PASSWORD'] }}"
     """)
-    spec = core_configure.load_spec(spec_path.strpath)
+    spec = core_configure.render_template(spec_path.strpath)
+    spec = yaml.load(spec)
 
     password_option = spec['fred']['options'][0]
     assert password_option['PASSWORD'] == 'a_password'
@@ -79,7 +81,7 @@ def test_load_spec_fails_missing_templated_envvars(capsys, tmpdir):
     spec_path.write(spec)
 
     with pytest.raises(SystemExit):
-        core_configure.load_spec(spec_path.strpath)
+        core_configure.render_template(spec_path.strpath)
 
     out, err = capsys.readouterr()
     expected = core_configure.MISSING_ENVVAR_MSG.format('')
@@ -93,7 +95,7 @@ def test_load_spec_fails_file_not_found(capsys):
     path = os.path.join(dirname, filename)
 
     with pytest.raises(SystemExit):
-        core_configure.load_spec(path)
+        core_configure.render_template(path)
 
     out, _ = capsys.readouterr()
     assert core_configure.FILE_OPEN_ERROR_MSG.format(path, '') in out
@@ -108,13 +110,9 @@ def test_verify_spec_fails(capsys):
                 - flub
         """
     spec = yaml.load(spec_yaml)
-
-    with pytest.raises(SystemExit):
-        core_configure.verify_spec(spec)
-
-    out, _ = capsys.readouterr()
-    expected = core_configure.VALIDATION_ERR_MSG.format('fred', 'attribute', 'unknown field\n')
-    assert expected in out
+    errors = core_configure.verify_schema(spec)
+    expected = core_configure.VALIDATION_ERR_MSG.format('fred', 'attribute', 'unknown field')
+    assert expected == errors[0]
 
 
 def test_verify_spec_succeeds(capsys):
@@ -126,7 +124,94 @@ def test_verify_spec_succeeds(capsys):
         mark:
         """
     spec = yaml.load(spec_yaml)
-    core_configure.verify_spec(spec)
+    errors = core_configure.verify_schema(spec)
+    assert len(errors) == 0
+
+
+def test_verify_spec_fails_multiple_roles_own_schema(capsys):
+    spec_yaml = """
+    jfinance:
+        owns:
+            schemas:
+                - finance_documents
+    jfauxnance:
+        owns:
+            schemas:
+                - finance_documents
+    """
+    spec = yaml.load(spec_yaml)
+    errors = core_configure.check_for_multi_schema_owners(spec)
+    expected = core_configure.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('finance_documents', 'jfinance, jfauxnance')
+    assert [expected] == errors
+
+
+def test_verify_spec_fails_multiple_roles_own_schema_personal_schema(capsys):
+    spec_yaml = """
+    jfinance:
+        has_personal_schema: yes
+        owns:
+            schemas:
+                - finance_documents
+    jfauxnance:
+        owns:
+            schemas:
+                - jfinance
+    """
+    spec = yaml.load(spec_yaml)
+    errors = core_configure.check_for_multi_schema_owners(spec)
+    expected = core_configure.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('jfinance', 'jfinance, jfauxnance')
+    assert [expected] == errors
+
+
+def test_verify_spec_fails_role_defined_multiple_times(tmpdir, capsys):
+    spec_path = tmpdir.join('spec.yml')
+    spec_path.write("""
+    jfinance:
+        owns:
+            schemas:
+                - finance_documents
+    jfinance:
+        owns:
+            schemas:
+                - even_more_finance_documents
+    patty:
+        owns:
+            schemas:
+                - tupperwear
+    """)
+    rendered_template = core_configure.render_template(spec_path.strpath)
+    errors = core_configure.detect_multiple_role_definitions(rendered_template)
+    expected = core_configure.DUPLICATE_ROLE_DEFINITIONS_ERR_MSG.format('jfinance')
+    assert [expected] == errors
+
+
+def test_verify_spec_fails_object_referenced_read_write(capsys):
+    spec_yaml = """
+    margerie:
+        can_login: true
+        privileges:
+            {}:
+                read:
+                    - big_bad
+                write:
+                    - big_bad
+    danil:
+        can_login: true
+        privileges:
+            sequences:
+                read:
+                    - hoop
+                write:
+                    - grok
+    """
+
+    privilege_types = ('schemas', 'sequences', 'tables')
+    for t in privilege_types:
+        spec = yaml.load(spec_yaml.format(t))
+        errors = core_configure.check_read_write_obj_references(spec)
+        err_string = "margerie: {'%s': ['big_bad']}" % t
+        expected = core_configure.OBJECT_REF_READ_WRITE_ERR.format(err_string)
+        assert [expected] == errors
 
 
 @pytest.mark.parametrize('statements, expected', [
