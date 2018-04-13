@@ -7,7 +7,7 @@ import yaml
 from pgbedrock import LOG_FORMAT
 from pgbedrock import common
 from pgbedrock.context import DatabaseContext, PRIVILEGE_MAP
-from pgbedrock.attributes import DEFAULT_ATTRIBUTES, COLUMN_NAME_TO_KEYWORD, is_valid_forever
+from pgbedrock.attributes import DEFAULT_ATTRIBUTES, COLUMN_NAME_TO_KEYWORD, IGNORE, is_valid_forever
 
 
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -284,11 +284,14 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
         return all_writes, only_reads
 
 
-def create_spec(host, port, user, password, dbname, verbose):
+def create_spec(host, port, user, password, dbname, role, verbose):
     db_connection = common.get_db_connection(host, port, dbname, user, password)
     # We will only be reading, so it is worth being safe here and ensuring that we can't write
     db_connection.set_session(readonly=True)
     cursor = db_connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    if role:
+        cursor.execute('SET ROLE=%(role)s', {'role': role})
 
     dbcontext = DatabaseContext(cursor, verbose)
     spec = initialize_spec(dbcontext)
@@ -310,7 +313,9 @@ def initialize_spec(dbcontext):
 def nondefault_attributes_as_list(rolename, nondefaults):
     results = []
     for attr, val in nondefaults.items():
-        if attr == 'rolvaliduntil':
+        if attr in IGNORE:
+            continue
+        elif attr == 'rolvaliduntil':
             valid_until_date = str(val.date())
             results.append("VALID UNTIL '{}'".format(valid_until_date))
         elif attr == 'rolconnlimit':
@@ -320,7 +325,7 @@ def nondefault_attributes_as_list(rolename, nondefaults):
             # rolpassword's val (which is just an md5 hash anyway)
             results.append('PASSWORD "{{{{ env[\'{}_PASSWORD\'] }}}}"'.format(rolename.upper()))
         else:
-            keyword = COLUMN_NAME_TO_KEYWORD[attr]
+            keyword = COLUMN_NAME_TO_KEYWORD.get(attr, attr)
             prefix = '' if val else 'NO'
             results.append(prefix + keyword)
 
@@ -352,15 +357,17 @@ def output_spec(spec):
 def remove_default_attributes(attributes):
     nondefaults = {}
     for attr, val in attributes.items():
-        if attr == 'rolvaliduntil' and not is_valid_forever(val):
+        if attr in IGNORE:
+            continue
+        elif attr == 'rolvaliduntil' and not is_valid_forever(val):
             nondefaults[attr] = val
-        elif attr not in ('rolname', 'rolvaliduntil') and val != DEFAULT_ATTRIBUTES[attr]:
+        elif attr not in ('rolname', 'rolvaliduntil') and val != DEFAULT_ATTRIBUTES.get(attr):
             nondefaults[attr] = val
 
     return nondefaults
 
 
-def generate(host, port, user, password, dbname, prompt, verbose):
+def generate(host, port, user, password, dbname, prompt, role, verbose):
     """
     Generate a YAML spec that represents the role attributes, memberships, object ownerships,
     and privileges for all roles in a database.
@@ -383,6 +390,8 @@ def generate(host, port, user, password, dbname, prompt, verbose):
 
         prompt - bool; whether to prompt for a password
 
+        role - str; perform SET ROLE to this value prior to operation
+
         verbose - bool; whether to show all queries that are executed and all debug log
             messages during execution
     """
@@ -393,5 +402,5 @@ def generate(host, port, user, password, dbname, prompt, verbose):
     if prompt:
         password = getpass.getpass()
 
-    spec = create_spec(host, port, user, password, dbname, verbose)
+    spec = create_spec(host, port, user, password, dbname, role, verbose)
     output_spec(spec)

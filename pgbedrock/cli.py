@@ -21,13 +21,14 @@ def entrypoint():
 @click.option('-w', '--password', default="", help='database user password; (default: "")')
 @click.option('-d', '--dbname', default=USER, help='database to connect to (default: "{}")'.format(USER))
 @click.option('--prompt/--no-prompt', default=False, help='prompt the user to input a password (default: --no-prompt)')
+@click.option('--role', default="", help='do SET ROLE prior to configuration')
 @click.option('--attributes/--no-attributes', default=True, help='whether to configure role attributes (default: --attributes)')
 @click.option('--memberships/--no-memberships', default=True, help='whether to configure memberships (default: --membership)')
 @click.option('--ownerships/--no-ownerships', default=True, help='whether to configure object ownerships (default: --ownerships)')
 @click.option('--privileges/--no-privileges', default=True, help='whether to configure privileges (default: --privileges)')
 @click.option('--live/--check', default=False, help='whether to actually make changes ("live") or only show what would be changed ("check") (default: --check)')
 @click.option('--verbose/--no-verbose', default=False, help='whether to show debug-level logging messages while running (default: --no-verbose)')
-def configure(spec, host, port, user, password, dbname, prompt, attributes, memberships, ownerships,
+def configure(spec, host, port, user, password, dbname, prompt, role, attributes, memberships, ownerships,
               privileges, live, verbose):
     """
     Configure the role attributes, memberships, object ownerships, and/or privileges of a
@@ -41,7 +42,7 @@ def configure(spec, host, port, user, password, dbname, prompt, attributes, memb
     In addition, using --verbose will print to STDOUT all debug statements and all SQL queries
     issued by pgbedrock.
     """
-    core_configure.configure(spec, host, port, user, password, dbname, prompt, attributes,
+    core_configure.configure(spec, host, port, user, password, dbname, prompt, role, attributes,
                              memberships, ownerships, privileges, live, verbose)
 
 
@@ -52,13 +53,14 @@ def configure(spec, host, port, user, password, dbname, prompt, attributes, memb
 @click.option('-w', '--password', default="", help='database user password; (default: "")')
 @click.option('-d', '--dbname', default=USER, help='database to connect to (default: "{}")'.format(USER))
 @click.option('--prompt/--no-prompt', default=False, help='prompt the user to input a password (default: --no-prompt)')
+@click.option('--role', default="", help='do SET ROLE prior to configuration')
 @click.option('--verbose/--no-verbose', default=False, help='whether to show debug-level logging messages while running (default: --no-verbose)')
-def generate(host, port, user, password, dbname, prompt, verbose):
+def generate(host, port, user, password, dbname, prompt, role, verbose):
     """
     Generate a YAML spec that represents the roles, memberships, ownerships, and/or privileges of a
     database.
     """
-    core_generate.generate(host, port, user, password, dbname, prompt, verbose)
+    core_generate.generate(host, port, user, password, dbname, prompt, role, verbose)
 
 
 if __name__ == '__main__':
