@@ -284,11 +284,14 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
         return all_writes, only_reads
 
 
-def create_spec(host, port, user, password, dbname, verbose):
+def create_spec(host, port, user, password, dbname, role, verbose):
     db_connection = common.get_db_connection(host, port, dbname, user, password)
     # We will only be reading, so it is worth being safe here and ensuring that we can't write
     db_connection.set_session(readonly=True)
     cursor = db_connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    if role:
+        cursor.execute('SET ROLE=%(role)s', {'role': role})
 
     dbcontext = DatabaseContext(cursor, verbose)
     spec = initialize_spec(dbcontext)
@@ -360,7 +363,7 @@ def remove_default_attributes(attributes):
     return nondefaults
 
 
-def generate(host, port, user, password, dbname, prompt, verbose):
+def generate(host, port, user, password, dbname, prompt, role, verbose):
     """
     Generate a YAML spec that represents the role attributes, memberships, object ownerships,
     and privileges for all roles in a database.
@@ -383,6 +386,8 @@ def generate(host, port, user, password, dbname, prompt, verbose):
 
         prompt - bool; whether to prompt for a password
 
+        role - str; perform SET ROLE to this value prior to operation
+
         verbose - bool; whether to show all queries that are executed and all debug log
             messages during execution
     """
@@ -393,5 +398,5 @@ def generate(host, port, user, password, dbname, prompt, verbose):
     if prompt:
         password = getpass.getpass()
 
-    spec = create_spec(host, port, user, password, dbname, verbose)
+    spec = create_spec(host, port, user, password, dbname, role, verbose)
     output_spec(spec)

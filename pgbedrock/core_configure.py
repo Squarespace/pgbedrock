@@ -250,7 +250,7 @@ def verify_spec(rendered_template, spec):
         common.fail('\n'.join(error_messages))
 
 
-def configure(spec, host, port, user, password, dbname, prompt, attributes, memberships,
+def configure(spec, host, port, user, password, dbname, prompt, role, attributes, memberships,
               ownerships, privileges, live, verbose):
     """
     Configure the role attributes, memberships, object ownerships, and/or privileges of a
@@ -275,6 +275,8 @@ def configure(spec, host, port, user, password, dbname, prompt, attributes, memb
         dbname - str; the database to connect to and configure
 
         prompt - bool; whether to prompt for a password
+
+        role - str; perform SET ROLE to this value prior to operation
 
         attributes - bool; whether to configure the role attributes for the specified
             database cluster
@@ -302,6 +304,8 @@ def configure(spec, host, port, user, password, dbname, prompt, attributes, memb
     db_connection = common.get_db_connection(host, port, dbname, user, password)
     cursor = db_connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
+    if role:
+        cursor.execute('SET ROLE=%(role)s', {'role': role})
 
     rendered_template = render_template(spec)
     spec = yaml.load(rendered_template)
