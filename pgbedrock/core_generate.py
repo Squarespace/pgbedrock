@@ -7,7 +7,7 @@ import yaml
 from pgbedrock import LOG_FORMAT
 from pgbedrock import common
 from pgbedrock.context import DatabaseContext, PRIVILEGE_MAP
-from pgbedrock.attributes import DEFAULT_ATTRIBUTES, COLUMN_NAME_TO_KEYWORD, is_valid_forever
+from pgbedrock.attributes import DEFAULT_ATTRIBUTES, COLUMN_NAME_TO_KEYWORD, IGNORE, is_valid_forever
 
 
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -313,7 +313,9 @@ def initialize_spec(dbcontext):
 def nondefault_attributes_as_list(rolename, nondefaults):
     results = []
     for attr, val in nondefaults.items():
-        if attr == 'rolvaliduntil':
+        if attr in IGNORE:
+            continue
+        elif attr == 'rolvaliduntil':
             valid_until_date = str(val.date())
             results.append("VALID UNTIL '{}'".format(valid_until_date))
         elif attr == 'rolconnlimit':
@@ -323,7 +325,7 @@ def nondefault_attributes_as_list(rolename, nondefaults):
             # rolpassword's val (which is just an md5 hash anyway)
             results.append('PASSWORD "{{{{ env[\'{}_PASSWORD\'] }}}}"'.format(rolename.upper()))
         else:
-            keyword = COLUMN_NAME_TO_KEYWORD[attr]
+            keyword = COLUMN_NAME_TO_KEYWORD.get(attr, attr)
             prefix = '' if val else 'NO'
             results.append(prefix + keyword)
 
@@ -355,9 +357,11 @@ def output_spec(spec):
 def remove_default_attributes(attributes):
     nondefaults = {}
     for attr, val in attributes.items():
-        if attr == 'rolvaliduntil' and not is_valid_forever(val):
+        if attr in IGNORE:
+            continue
+        elif attr == 'rolvaliduntil' and not is_valid_forever(val):
             nondefaults[attr] = val
-        elif attr not in ('rolname', 'rolvaliduntil') and val != DEFAULT_ATTRIBUTES[attr]:
+        elif attr not in ('rolname', 'rolvaliduntil') and val != DEFAULT_ATTRIBUTES.get(attr):
             nondefaults[attr] = val
 
     return nondefaults

@@ -56,6 +56,9 @@ PG_COLUMN_NAME = {
 # We also need a reverse lookup of PG_COLUMN_NAME
 COLUMN_NAME_TO_KEYWORD = {v: k for k, v in PG_COLUMN_NAME.items()}
 
+# Columns to ignore (Pre Postgres 9.5)
+IGNORE = ['rolcatupdate']
+
 
 def analyze_attributes(spec, cursor, verbose):
     logger.debug('Starting analyze_attributes()')
