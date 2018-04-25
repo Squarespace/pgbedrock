@@ -133,7 +133,7 @@ Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
         nsp.nspname AS schema,
         map.objkind,
         nsp.nspname || '."' || c.relname || '"' AS objname,
-        r.rolname AS owner,
+        auth.rolname AS owner,
         -- Auto-dependency means that a sequence is linked to a table. Ownership of
         -- that sequence automatically derives from the table's ownership
         COUNT(deps.refobjid) > 0 AS has_auto_dependency
@@ -143,8 +143,8 @@ Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
             ON c.relnamespace = nsp.oid
         JOIN relkind_mapping map
             ON c.relkind = map.objkey
-        JOIN pg_roles r
-            ON c.relowner = r.OID
+        JOIN pg_authid auth
+            ON c.relowner = auth.OID
         LEFT JOIN pg_depend deps
             ON deps.objid = c.oid
             AND deps.classid = 'pg_class'::REGCLASS
