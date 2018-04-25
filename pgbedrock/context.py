@@ -150,8 +150,6 @@ Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
             AND deps.classid = 'pg_class'::REGCLASS
             AND deps.refclassid = 'pg_class'::REGCLASS
             AND deps.deptype = 'a'
-        LEFT JOIN pg_class owning_obj
-            ON owning_obj.oid = deps.refobjid
     WHERE
         nsp.nspname NOT LIKE 'pg\_t%'
     GROUP BY
