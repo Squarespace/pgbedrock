@@ -160,7 +160,7 @@ Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
     ;
     """
 
-Q_GET_ALL_OBJECT_OWNERS = """
+Q_GET_ALL_OBJECT_ATTRIBUTES = """
     WITH relkind_mapping (objkey, objkind) AS (
         VALUES ('r', 'tables'),
                ('v', 'tables'),
@@ -257,7 +257,7 @@ class DatabaseContext(object):
     cacheables = {
         'get_all_current_defaults',
         'get_all_current_nondefaults',
-        'get_all_object_owners',
+        'get_all_object_attributes',
         'get_all_role_attributes',
         'get_all_memberships',
         'get_all_nonschema_objects_and_owners',
@@ -433,7 +433,7 @@ class DatabaseContext(object):
         role_attributes = self.get_role_attributes(rolename)
         return role_attributes.get('rolsuper', False)
 
-    def get_all_object_owners(self):
+    def get_all_object_attributes(self):
         """ Return a dict of the form:
             {objkindA: {
                 'schemaA': {
@@ -459,7 +459,7 @@ class DatabaseContext(object):
         """
         OwnerRow = namedtuple('OwnerRow',
                               ['objkind', 'schema', 'objname', 'owner', 'is_dependent'])
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_OBJECT_OWNERS)
+        common.run_query(self.cursor, self.verbose, Q_GET_ALL_OBJECT_ATTRIBUTES)
         all_object_owners = defaultdict(dict)
         for i in self.cursor.fetchall():
             row = OwnerRow(*i)
@@ -479,7 +479,7 @@ class DatabaseContext(object):
 
     def get_all_schemas_and_owners(self):
         """ Return a dict of {schema_name: schema_owner} """
-        all_object_owners = self.get_all_object_owners()
+        all_object_owners = self.get_all_object_attributes()
         schemas_subdict = all_object_owners.get('schemas', {})
         schema_owners = {k: v[k]['owner'] for k, v in schemas_subdict.items()}
         return schema_owners
@@ -514,7 +514,7 @@ class DatabaseContext(object):
         return schema_objects
 
     def get_schema_objects(self, schema):
-        # all_object_owners = self.get_all_object_owners()
+        # all_object_owners = self.get_all_object_attributes()
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
         return all_objects_and_owners.get(schema, [])
 

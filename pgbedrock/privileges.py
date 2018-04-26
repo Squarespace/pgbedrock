@@ -210,7 +210,7 @@ class PrivilegeAnalyzer(object):
 
         self.current_defaults = dbcontext.get_role_current_defaults(rolename, object_kind, access)
         self.current_nondefaults = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
-        self.all_object_owners = dbcontext.get_all_object_owners()
+        self.all_object_attrs = dbcontext.get_all_object_attributes()
 
     def analyze(self):
         self.identify_desired_objects()
@@ -265,7 +265,7 @@ class PrivilegeAnalyzer(object):
     def get_object_owner(self, item, objkind=None):
         objkind = objkind or self.object_kind
         schema = item.split('.', 1)[0]
-        object_owners = self.all_object_owners.get(objkind, dict()).get(schema, dict())
+        object_owners = self.all_object_attrs.get(objkind, dict()).get(schema, dict())
         owner = object_owners.get(item, dict()).get('owner', None)
         if owner:
             return owner
@@ -277,7 +277,7 @@ class PrivilegeAnalyzer(object):
     def get_schema_objects(self, schema):
         """ Get all objects of kind self.object_kind which are in the given schema and not owned by
         self.rolename """
-        object_owners = self.all_object_owners.get(self.object_kind, dict()).get(schema, dict())
+        object_owners = self.all_object_attrs.get(self.object_kind, dict()).get(schema, dict())
         return {name for name, attr in object_owners.items() if attr['owner'] != self.rolename}
 
     def get_schema_owner(self, schema):

@@ -238,7 +238,7 @@ def test_get_role_objects_with_access(access, expected):
         # Role3 owns 1 table (2) and 0 sequences
         Q_CREATE_TABLE.format(ROLES[3], SCHEMAS[0], TABLES[2]),
     ])
-def test_get_all_object_owners(cursor):
+def test_get_all_object_attributes(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     expected = {
         'tables': {
@@ -265,7 +265,7 @@ def test_get_all_object_owners(cursor):
         }
     }
 
-    actual = dbcontext.get_all_object_owners()
+    actual = dbcontext.get_all_object_attributes()
 
     # We do this to avoid having to look at / filter out entries from
     # information_schema or pg_catalog
@@ -276,7 +276,7 @@ def test_get_all_object_owners(cursor):
 
     # Make sure that this data is cached for future use
     cursor.close()
-    actual_again = dbcontext.get_all_object_owners()
+    actual_again = dbcontext.get_all_object_attributes()
     assert actual_again == actual
 
 
