@@ -215,19 +215,6 @@ Q_GET_ALL_PERSONAL_SCHEMAS = """
     ;
     """
 
-Q_GET_ALL_SCHEMAS_AND_OWNERS = """
-    SELECT
-        nsp.nspname AS schema,
-        auth.rolname AS owner
-    FROM pg_namespace nsp
-    JOIN pg_authid auth
-        ON nsp.nspowner = auth.OID
-    WHERE
-        nsp.nspname NOT LIKE 'pg\_t%'
-    ORDER BY nsp.nspname
-    ;
-    """
-
 # Write access causes read access to be granted as well. As a result, we
 # don't add things like SELECT for tables into the write privileges
 PRIVILEGE_MAP = {
@@ -472,8 +459,12 @@ class DatabaseContext(object):
 
     def get_all_schemas_and_owners(self):
         """ Return a dict of {schema_name: schema_owner} """
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_SCHEMAS_AND_OWNERS)
-        return {row['schema']: row['owner'] for row in self.cursor.fetchall()}
+        all_object_owners = self.get_all_object_owners()
+        schemas_subdict = all_object_owners.get('schemas', {})
+        # Remove the nesting in the schemas subdict, which looks like:
+        #     {schema0: {schema0: owner0}, {schema1, {schema1: owner1}}
+        schema_owners = {k: v[k] for k, v in schemas_subdict.items()}
+        return schema_owners
 
     def get_schema_owner(self, schema):
         all_schemas_and_owners = self.get_all_schemas_and_owners()
