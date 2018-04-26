@@ -243,24 +243,24 @@ def test_get_all_object_owners(cursor):
     expected = {
         'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[0]): ROLES[1],
-                quoted_object(SCHEMAS[0], TABLES[1]): ROLES[1],
-                quoted_object(SCHEMAS[0], TABLES[2]): ROLES[3],
+                quoted_object(SCHEMAS[0], TABLES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], TABLES[1]): {'owner': ROLES[1], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], TABLES[2]): {'owner': ROLES[3], 'is_dependent': False},
             }
         },
         'sequences': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], SEQUENCES[0]): ROLES[1],
-                quoted_object(SCHEMAS[0], SEQUENCES[1]): ROLES[2],
-                quoted_object(SCHEMAS[0], SEQUENCES[2]): ROLES[2],
+                quoted_object(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[2], 'is_dependent': False},
             }
         },
         'schemas': {
             SCHEMAS[0]: {
-                SCHEMAS[0]: ROLES[0],
+                SCHEMAS[0]: {'owner': ROLES[0], 'is_dependent': False},
             },
             'public': {
-                'public': 'postgres',
+                'public': {'owner': 'postgres', 'is_dependent': False},
             }
         }
     }

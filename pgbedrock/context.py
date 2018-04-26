@@ -172,19 +172,33 @@ Q_GET_ALL_OBJECT_OWNERS = """
             map.objkind,
             nsp.nspname AS schema,
             nsp.nspname || '."' || c.relname || '"' AS objname,
-            c.relowner AS owner_id
+            c.relowner AS owner_id,
+            -- Auto-dependency means that a sequence is linked to a table. Ownership of
+            -- that sequence automatically derives from the table's ownership
+            COUNT(deps.refobjid) > 0 AS has_auto_dependency
         FROM
             pg_class c
             JOIN relkind_mapping map
                 ON c.relkind = map.objkey
             JOIN pg_namespace nsp
                 ON c.relnamespace = nsp.OID
+            LEFT JOIN pg_depend deps
+                ON deps.objid = c.oid
+                AND deps.classid = 'pg_class'::REGCLASS
+                AND deps.refclassid = 'pg_class'::REGCLASS
+                AND deps.deptype = 'a'
+        GROUP BY
+            map.objkind,
+            schema,
+            objname,
+            owner_id
     ), schemas AS (
         SELECT
             'schemas'::TEXT AS objkind,
             nsp.nspname AS schema,
             nsp.nspname AS objname,
-            nsp.nspowner AS owner_id
+            nsp.nspowner AS owner_id,
+            FALSE AS has_auto_dependency
         FROM pg_namespace nsp
     ), combined AS (
         SELECT *
@@ -197,7 +211,8 @@ Q_GET_ALL_OBJECT_OWNERS = """
         co.objkind,
         co.schema,
         co.objname,
-        t_owner.rolname AS owner
+        t_owner.rolname AS owner,
+        co.has_auto_dependency
     FROM combined AS co
     JOIN pg_authid t_owner
         ON co.owner_id = t_owner.OID
@@ -422,24 +437,28 @@ class DatabaseContext(object):
         """ Return a dict of the form:
             {objkindA: {
                 'schemaA': {
-                    'objnameA': ownerA,
-                    'objnameB': ownerB,
-                    }
+                    'objnameA': {
+                        'owner': ownerA,
+                        'is_dependent': False,
+                        },
+                    'objnameB': {
+                        'owner': ownerB,
+                        'is_dependent': True,
+                        },
+                    },
                 'schemaB': ...
                  ...
                 },
             objkindB:
                 ....
             }
-        i.e. we can access an object's owner via output[objkind][schema][objname]
+        i.e. we can access an object's owner via output[objkind][schema][objname]['owner']
 
-        This structure is chosen to allow for looking up:
-            1) object ownership
-            2) all owners in a given schema
-            3) all objects in a given schema
+        This structure is chosen to match as closely as possible the structure of spec files
+        as we typically access this structure as we are building out or reading through a spec
         """
         OwnerRow = namedtuple('OwnerRow',
-                              ['objkind', 'schema', 'objname', 'owner'])
+                              ['objkind', 'schema', 'objname', 'owner', 'is_dependent'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_OBJECT_OWNERS)
         all_object_owners = defaultdict(dict)
         for i in self.cursor.fetchall():
@@ -448,7 +467,8 @@ class DatabaseContext(object):
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.objname] = row.owner
+            objkind_owners[row.schema][row.objname] = {'owner': row.owner,
+                                                       'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -461,9 +481,7 @@ class DatabaseContext(object):
         """ Return a dict of {schema_name: schema_owner} """
         all_object_owners = self.get_all_object_owners()
         schemas_subdict = all_object_owners.get('schemas', {})
-        # Remove the nesting in the schemas subdict, which looks like:
-        #     {schema0: {schema0: owner0}, {schema1, {schema1: owner1}}
-        schema_owners = {k: v[k] for k, v in schemas_subdict.items()}
+        schema_owners = {k: v[k]['owner'] for k, v in schemas_subdict.items()}
         return schema_owners
 
     def get_schema_owner(self, schema):
@@ -476,7 +494,7 @@ class DatabaseContext(object):
         return role_memberships
 
     def get_all_personal_schemas(self):
-        """ Return all personal schemas as a list """
+        """ Return all personal schemas as a set """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_PERSONAL_SCHEMAS)
         personal_schemas = set([i[0] for i in self.cursor.fetchall()])
         return personal_schemas
@@ -496,6 +514,7 @@ class DatabaseContext(object):
         return schema_objects
 
     def get_schema_objects(self, schema):
+        # all_object_owners = self.get_all_object_owners()
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
         return all_objects_and_owners.get(schema, [])
 
