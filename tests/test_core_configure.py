@@ -306,8 +306,6 @@ def test_configure_live_mode_works(capsys, cursor, tiny_spec, db_config, live_mo
         assert cursor.fetchone()[0] is True
 
 
-@pytest.mark.skipif(pytest.config.getoption('capture') != 'no',
-                    reason='Requires `pytest -s` mode to inspect verbose output messages')
 @pytest.mark.usefixtures('drop_users_and_objects')
 def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_config):
     """
