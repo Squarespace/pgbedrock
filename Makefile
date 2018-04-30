@@ -70,7 +70,7 @@ release_quay: test build
 
 remove_network: stop_postgres
 	@echo "Removing the docker network (if it exists)"
-	-docker network rm $(COMPOSED_NETWORK)
+	-docker network rm $(COMPOSED_NETWORK) || true
 
 start_postgres: create_network stop_postgres
 	@echo "Starting postgres"
@@ -78,13 +78,13 @@ start_postgres: create_network stop_postgres
         -e POSTGRES_USER=$(POSTGRES_USER) \
         -e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
         -e POSTGRES_DB=$(POSTGRES_DB) \
-        -p 5432:5432 \
+		-p 54321:5432 \
         --net=$(COMPOSED_NETWORK) \
         postgres:9.6.4
 
 stop_postgres:
 	@echo "Stopping postgres (if it is running)"
-	@-docker stop $(POSTGRES_HOST)
+	@-docker stop $(POSTGRES_HOST) || true
 
 test: clean build_tester create_network start_postgres wait_for_postgres test27 test36 stop_postgres clean
 
@@ -108,8 +108,12 @@ test36:
 
 wait_for_postgres:
 	@echo 'Sleeping while postgres starts up';
-	@pg_isready -h localhost -q; \
-	while [[ $$? -ne 0 ]]; do \
-	    sleep 0.1; \
-	    pg_isready -h localhost -q; \
-	done;
+	@docker run --rm -it --name wait_for_postgres \
+        -e POSTGRES_HOST=$(POSTGRES_HOST) \
+        -e POSTGRES_USER=$(POSTGRES_USER) \
+        -e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
+        -e POSTGRES_DB=$(POSTGRES_DB) \
+		-v $(shell pwd)/tests/wait_for_postgres.sh:/wait_for_postgres.sh \
+        --net=$(COMPOSED_NETWORK) \
+		--entrypoint="/wait_for_postgres.sh" \
+        postgres:9.6.4

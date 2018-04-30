@@ -23,9 +23,17 @@ NEW_USER = 'foobar'
 
 @pytest.fixture(scope='session')
 def db_config():
-    host = 'pgbedrock_postgres' if os.environ.get('WITHIN_DOCKER_FLAG') else 'localhost'
+    """
+    db config assumes you are using the postgres db provided by the docker
+    container either connecting to it through localhost if you're running the
+    test suite outside of docker, or through docker's network if you are running
+    the test suite from within docker
+    """
+    in_docker = os.environ.get('WITHIN_DOCKER_FLAG', False)
+    host = 'pgbedrock_postgres' if in_docker else 'localhost'
+    port = 5432 if in_docker else 54321
     yield {'host': host,
-           'port': 5432,
+           'port': port,
            'user': 'test_user',
            'password': 'test_password',
            'dbname': 'test_db'}
