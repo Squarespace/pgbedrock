@@ -121,45 +121,6 @@ Q_GET_ALL_MEMBERSHIPS = """
     ;
     """
 
-Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
-    WITH relkind_mapping (objkey, objkind) AS (
-        VALUES ('r', 'tables'),
-               ('v', 'tables'),
-               ('m', 'tables'),
-               ('f', 'tables'),
-               ('S', 'sequences')
-    )
-    SELECT
-        nsp.nspname AS schema,
-        map.objkind,
-        nsp.nspname || '."' || c.relname || '"' AS objname,
-        auth.rolname AS owner,
-        -- Auto-dependency means that a sequence is linked to a table. Ownership of
-        -- that sequence automatically derives from the table's ownership
-        COUNT(deps.refobjid) > 0 AS has_auto_dependency
-    FROM
-        pg_class c
-        JOIN pg_namespace nsp
-            ON c.relnamespace = nsp.oid
-        JOIN relkind_mapping map
-            ON c.relkind = map.objkey
-        JOIN pg_authid auth
-            ON c.relowner = auth.OID
-        LEFT JOIN pg_depend deps
-            ON deps.objid = c.oid
-            AND deps.classid = 'pg_class'::REGCLASS
-            AND deps.refclassid = 'pg_class'::REGCLASS
-            AND deps.deptype = 'a'
-    WHERE
-        nsp.nspname NOT LIKE 'pg\_t%'
-    GROUP BY
-        schema,
-        map.objkind,
-        objname,
-        owner
-    ;
-    """
-
 Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
     WITH relkind_mapping (objkey, kind) AS (
         VALUES ('r', 'tables'),
@@ -513,18 +474,15 @@ class DatabaseContext(object):
         """ For all objkinds other than schemas return a dict of the form
                 {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
         """
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS)
-
         schema_objects = collections.defaultdict(list)
-        for i in self.cursor.fetchall():
-            schema = i[0]
-            objinfo = ObjectInfo(*i[1:])
-            schema_objects[schema].append(objinfo)
+        for row in self.fetch_all_object_attributes():
+            if row.kind != 'schemas':
+                objinfo = ObjectInfo(row.kind, row.name, row.owner, row.is_dependent)
+                schema_objects[row.schema].append(objinfo)
 
         return schema_objects
 
     def get_schema_objects(self, schema):
-        # all_object_owners = self.get_all_object_attributes()
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
         return all_objects_and_owners.get(schema, [])
 
