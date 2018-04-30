@@ -1,4 +1,3 @@
-import collections
 import logging
 
 from collections import defaultdict, namedtuple
@@ -208,7 +207,7 @@ PRIVILEGE_MAP = {
          },
 }
 
-ObjectInfo = collections.namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
+ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
 
 
 class DatabaseContext(object):
@@ -474,7 +473,7 @@ class DatabaseContext(object):
         """ For all objkinds other than schemas return a dict of the form
                 {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
         """
-        schema_objects = collections.defaultdict(list)
+        schema_objects = defaultdict(list)
         for row in self.fetch_all_object_attributes():
             if row.kind != 'schemas':
                 objinfo = ObjectInfo(row.kind, row.name, row.owner, row.is_dependent)
