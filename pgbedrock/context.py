@@ -160,7 +160,7 @@ Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
     ;
     """
 
-Q_GET_ALL_OBJECT_ATTRIBUTES = """
+Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
     WITH relkind_mapping (objkey, objkind) AS (
         VALUES ('r', 'tables'),
                ('v', 'tables'),
@@ -255,6 +255,7 @@ class DatabaseContext(object):
     has not already been fetched, fetch it (this is implemented via __getattribute__ below) """
 
     cacheables = {
+        'fetch_all_object_attributes',
         'get_all_current_defaults',
         'get_all_current_nondefaults',
         'get_all_object_attributes',
@@ -433,6 +434,16 @@ class DatabaseContext(object):
         role_attributes = self.get_role_attributes(rolename)
         return role_attributes.get('rolsuper', False)
 
+    def fetch_all_object_attributes(self):
+        """
+        Fetch results for all object attributes.
+
+        The results are used in several subsequent methods, so having consistent results is
+        important. Thus, this helper method is here to ensure that we only run this query once.
+        """
+        common.run_query(self.cursor, self.verbose, Q_FETCH_ALL_OBJECT_ATTRIBUTES)
+        return self.cursor.fetchall()
+
     def get_all_object_attributes(self):
         """ Return a dict of the form:
             {objkindA: {
@@ -459,10 +470,9 @@ class DatabaseContext(object):
         """
         OwnerRow = namedtuple('OwnerRow',
                               ['objkind', 'schema', 'objname', 'owner', 'is_dependent'])
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_OBJECT_ATTRIBUTES)
         all_object_owners = defaultdict(dict)
-        for i in self.cursor.fetchall():
-            row = OwnerRow(*i)
+        for row in self.fetch_all_object_attributes():
+            row = OwnerRow(*row)
             objkind_owners = all_object_owners[row.objkind]
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
