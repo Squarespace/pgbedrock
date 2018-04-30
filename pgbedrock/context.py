@@ -161,7 +161,7 @@ Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
     """
 
 Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
-    WITH relkind_mapping (objkey, objkind) AS (
+    WITH relkind_mapping (objkey, kind) AS (
         VALUES ('r', 'tables'),
                ('v', 'tables'),
                ('m', 'tables'),
@@ -169,13 +169,13 @@ Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
                ('S', 'sequences')
     ), tables_and_sequences AS (
         SELECT
-            map.objkind,
+            map.kind,
             nsp.nspname AS schema,
-            nsp.nspname || '."' || c.relname || '"' AS objname,
+            nsp.nspname || '."' || c.relname || '"' AS name,
             c.relowner AS owner_id,
             -- Auto-dependency means that a sequence is linked to a table. Ownership of
             -- that sequence automatically derives from the table's ownership
-            COUNT(deps.refobjid) > 0 AS has_auto_dependency
+            COUNT(deps.refobjid) > 0 AS is_dependent
         FROM
             pg_class c
             JOIN relkind_mapping map
@@ -188,17 +188,17 @@ Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
                 AND deps.refclassid = 'pg_class'::REGCLASS
                 AND deps.deptype = 'a'
         GROUP BY
-            map.objkind,
+            map.kind,
             schema,
-            objname,
+            name,
             owner_id
     ), schemas AS (
         SELECT
-            'schemas'::TEXT AS objkind,
+            'schemas'::TEXT AS kind,
             nsp.nspname AS schema,
-            nsp.nspname AS objname,
+            nsp.nspname AS name,
             nsp.nspowner AS owner_id,
-            FALSE AS has_auto_dependency
+            FALSE AS is_dependent
         FROM pg_namespace nsp
     ), combined AS (
         SELECT *
@@ -208,11 +208,11 @@ Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
         FROM schemas
     )
     SELECT
-        co.objkind,
+        co.kind,
         co.schema,
-        co.objname,
+        co.name,
         t_owner.rolname AS owner,
-        co.has_auto_dependency
+        co.is_dependent
     FROM combined AS co
     JOIN pg_authid t_owner
         ON co.owner_id = t_owner.OID
@@ -441,8 +441,11 @@ class DatabaseContext(object):
         The results are used in several subsequent methods, so having consistent results is
         important. Thus, this helper method is here to ensure that we only run this query once.
         """
+        ObjectAttributes = namedtuple('ObjectAttributes',
+                                      ['kind', 'schema', 'name', 'owner', 'is_dependent'])
         common.run_query(self.cursor, self.verbose, Q_FETCH_ALL_OBJECT_ATTRIBUTES)
-        return self.cursor.fetchall()
+        results = [ObjectAttributes(*row) for row in self.cursor.fetchall()]
+        return results
 
     def get_all_object_attributes(self):
         """ Return a dict of the form:
@@ -461,24 +464,21 @@ class DatabaseContext(object):
                  ...
                 },
             objkindB:
-                ....
+                ...
             }
         i.e. we can access an object's owner via output[objkind][schema][objname]['owner']
 
         This structure is chosen to match as closely as possible the structure of spec files
         as we typically access this structure as we are building out or reading through a spec
         """
-        OwnerRow = namedtuple('OwnerRow',
-                              ['objkind', 'schema', 'objname', 'owner', 'is_dependent'])
         all_object_owners = defaultdict(dict)
         for row in self.fetch_all_object_attributes():
-            row = OwnerRow(*row)
-            objkind_owners = all_object_owners[row.objkind]
+            objkind_owners = all_object_owners[row.kind]
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.objname] = {'owner': row.owner,
-                                                       'is_dependent': row.is_dependent}
+            objkind_owners[row.schema][row.name] = {'owner': row.owner,
+                                                    'is_dependent': row.is_dependent}
 
         return all_object_owners
 

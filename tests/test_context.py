@@ -466,3 +466,11 @@ def test_get_schema_objects_no_entry():
     }
     actual = dbcontext.get_schema_objects('key_not_in_response')
     assert actual == []
+
+
+def test_fetch_all_object_attributes(cursor):
+    dbcontext = context.DatabaseContext(cursor, verbose=True)
+    fetched = dbcontext.fetch_all_object_attributes()
+    assert isinstance(fetched, list)
+    assert len(fetched) > 0
+    assert isinstance(fetched[0], tuple)
