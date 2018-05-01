@@ -490,9 +490,10 @@ class DatabaseContext(object):
         return all_objects_and_owners.get(schema, [])
 
     def is_schema_empty(self, schema, object_kind):
+        """ Determine if the schema is empty with regard to the object kind specified """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
-        for objkind, objname, _, _ in all_objects_and_owners.get(schema, []):
-            if objkind == object_kind:
+        for obj in all_objects_and_owners.get(schema, []):
+            if obj.kind == object_kind:
                 return False
 
         return True
