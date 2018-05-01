@@ -468,9 +468,9 @@ def test_get_schema_objects_no_entry():
     assert actual == []
 
 
-def test_fetch_all_object_attributes(cursor):
+def test_get_all_raw_object_attributes(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
-    fetched = dbcontext.fetch_all_object_attributes()
-    assert isinstance(fetched, list)
-    assert len(fetched) > 0
-    assert isinstance(fetched[0], tuple)
+    raw_results = dbcontext.get_all_raw_object_attributes()
+    assert isinstance(raw_results, list)
+    assert len(raw_results) > 0
+    assert isinstance(raw_results[0], tuple)

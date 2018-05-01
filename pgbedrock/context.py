@@ -120,7 +120,7 @@ Q_GET_ALL_MEMBERSHIPS = """
     ;
     """
 
-Q_FETCH_ALL_OBJECT_ATTRIBUTES = """
+Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
     WITH relkind_mapping (objkey, kind) AS (
         VALUES ('r', 'tables'),
                ('v', 'tables'),
@@ -215,7 +215,7 @@ class DatabaseContext(object):
     has not already been fetched, fetch it (this is implemented via __getattribute__ below) """
 
     cacheables = {
-        'fetch_all_object_attributes',
+        'get_all_raw_object_attributes',
         'get_all_current_defaults',
         'get_all_current_nondefaults',
         'get_all_object_attributes',
@@ -394,7 +394,7 @@ class DatabaseContext(object):
         role_attributes = self.get_role_attributes(rolename)
         return role_attributes.get('rolsuper', False)
 
-    def fetch_all_object_attributes(self):
+    def get_all_raw_object_attributes(self):
         """
         Fetch results for all object attributes.
 
@@ -403,7 +403,7 @@ class DatabaseContext(object):
         """
         ObjectAttributes = namedtuple('ObjectAttributes',
                                       ['kind', 'schema', 'name', 'owner', 'is_dependent'])
-        common.run_query(self.cursor, self.verbose, Q_FETCH_ALL_OBJECT_ATTRIBUTES)
+        common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
         results = [ObjectAttributes(*row) for row in self.cursor.fetchall()]
         return results
 
@@ -432,7 +432,7 @@ class DatabaseContext(object):
         as we typically access this structure as we are building out or reading through a spec
         """
         all_object_owners = defaultdict(dict)
-        for row in self.fetch_all_object_attributes():
+        for row in self.get_all_raw_object_attributes():
             objkind_owners = all_object_owners[row.kind]
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
@@ -470,11 +470,15 @@ class DatabaseContext(object):
         return personal_schemas
 
     def get_all_nonschema_objects_and_owners(self):
-        """ For all objkinds other than schemas return a dict of the form
-                {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
+        """
+        For all objkinds other than schemas return a dict of the form
+            {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
+
+        This is primarily a helper for DatabaseContext.get_schema_objects so we have O(1)
+        schema object lookups instead of needing to iterate through all objects every time
         """
         schema_objects = defaultdict(list)
-        for row in self.fetch_all_object_attributes():
+        for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
                 objinfo = ObjectInfo(row.kind, row.name, row.owner, row.is_dependent)
                 schema_objects[row.schema].append(objinfo)
