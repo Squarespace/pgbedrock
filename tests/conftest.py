@@ -31,7 +31,7 @@ def db_config():
     """
     in_docker = os.environ.get('WITHIN_DOCKER_FLAG', False)
     host = 'pgbedrock_postgres' if in_docker else 'localhost'
-    port = 5432 if in_docker else 54321
+    port = int(os.environ.get('POSTGRES_PORT', '54321'))
     yield {'host': host,
            'port': port,
            'user': 'test_user',

@@ -93,6 +93,7 @@ test27:
 	@docker run \
         --rm \
         -e WITHIN_DOCKER_FLAG=true \
+        -e POSTGRES_PORT=5432 \
         -v $(shell pwd):/opt \
         --net=$(COMPOSED_NETWORK) \
         tester27
@@ -102,6 +103,7 @@ test36:
 	@docker run \
         --rm \
         -e WITHIN_DOCKER_FLAG=true \
+        -e POSTGRES_PORT=5432 \
         -v $(shell pwd):/opt \
         --net=$(COMPOSED_NETWORK) \
         tester36

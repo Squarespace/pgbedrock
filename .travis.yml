@@ -3,7 +3,9 @@ python:
   - "2.7"
   - "3.6"
 services:
-    - postgresql
+  - postgresql
+env:
+  - POSTGRES_PORT=5432
 install:
   - pip install -e . -r requirements-dev.txt
 
