@@ -474,3 +474,8 @@ def test_get_all_raw_object_attributes(cursor):
     assert isinstance(raw_results, list)
     assert len(raw_results) > 0
     assert isinstance(raw_results[0], tuple)
+
+    # Make sure that this data is cached for future use
+    cursor.close()
+    raw_results_again = dbcontext.get_all_raw_object_attributes()
+    assert raw_results_again == raw_results
