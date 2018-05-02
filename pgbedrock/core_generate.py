@@ -360,6 +360,25 @@ def remove_default_attributes(attributes):
     return nondefaults
 
 
+def sort_sublists(data):
+    """
+    Ensure that any lists within the provided (possibly nested) structure are sorted. This is
+    done because PyYAML will sort the keys in a mapping but preserves the order of lists.
+
+    While it would be possible to ensure everything is sorted upstream, i.e. when it is added to
+    each sublist, putting this functionality into a function becomes cleaner for testing and a
+    better separation of concerns
+    """
+    if isinstance(data, dict):
+        for key, values in data.items():
+            sorted_values = sort_sublists(values)
+            data[key] = sorted_values
+    elif isinstance(data, list):
+        data = sorted(data)
+
+    return data
+
+
 def generate(host, port, user, password, dbname, prompt, verbose):
     """
     Generate a YAML spec that represents the role attributes, memberships, object ownerships,
@@ -394,4 +413,5 @@ def generate(host, port, user, password, dbname, prompt, verbose):
         password = getpass.getpass()
 
     spec = create_spec(host, port, user, password, dbname, verbose)
-    output_spec(spec)
+    sorted_spec = sort_sublists(spec)
+    output_spec(sorted_spec)
