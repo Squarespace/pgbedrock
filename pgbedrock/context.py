@@ -1,4 +1,3 @@
-import collections
 import logging
 
 from collections import defaultdict, namedtuple
@@ -121,49 +120,8 @@ Q_GET_ALL_MEMBERSHIPS = """
     ;
     """
 
-Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS = """
-    WITH relkind_mapping (objkey, objkind) AS (
-        VALUES ('r', 'tables'),
-               ('v', 'tables'),
-               ('m', 'tables'),
-               ('f', 'tables'),
-               ('S', 'sequences')
-    )
-    SELECT
-        nsp.nspname AS schema,
-        map.objkind,
-        nsp.nspname || '."' || c.relname || '"' AS objname,
-        r.rolname AS owner,
-        -- Auto-dependency means that a sequence is linked to a table. Ownership of
-        -- that sequence automatically derives from the table's ownership
-        COUNT(deps.refobjid) > 0 AS has_auto_dependency
-    FROM
-        pg_class c
-        JOIN pg_namespace nsp
-            ON c.relnamespace = nsp.oid
-        JOIN relkind_mapping map
-            ON c.relkind = map.objkey
-        JOIN pg_roles r
-            ON c.relowner = r.OID
-        LEFT JOIN pg_depend deps
-            ON deps.objid = c.oid
-            AND deps.classid = 'pg_class'::REGCLASS
-            AND deps.refclassid = 'pg_class'::REGCLASS
-            AND deps.deptype = 'a'
-        LEFT JOIN pg_class owning_obj
-            ON owning_obj.oid = deps.refobjid
-    WHERE
-        nsp.nspname NOT LIKE 'pg\_t%'
-    GROUP BY
-        schema,
-        map.objkind,
-        objname,
-        owner
-    ;
-    """
-
-Q_GET_ALL_OBJECT_OWNERS = """
-    WITH relkind_mapping (objkey, objkind) AS (
+Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
+    WITH relkind_mapping (objkey, kind) AS (
         VALUES ('r', 'tables'),
                ('v', 'tables'),
                ('m', 'tables'),
@@ -171,22 +129,36 @@ Q_GET_ALL_OBJECT_OWNERS = """
                ('S', 'sequences')
     ), tables_and_sequences AS (
         SELECT
-            map.objkind,
+            map.kind,
             nsp.nspname AS schema,
-            nsp.nspname || '."' || c.relname || '"' AS objname,
-            c.relowner AS owner_id
+            nsp.nspname || '."' || c.relname || '"' AS name,
+            c.relowner AS owner_id,
+            -- Auto-dependency means that a sequence is linked to a table. Ownership of
+            -- that sequence automatically derives from the table's ownership
+            COUNT(deps.refobjid) > 0 AS is_dependent
         FROM
             pg_class c
             JOIN relkind_mapping map
                 ON c.relkind = map.objkey
             JOIN pg_namespace nsp
                 ON c.relnamespace = nsp.OID
+            LEFT JOIN pg_depend deps
+                ON deps.objid = c.oid
+                AND deps.classid = 'pg_class'::REGCLASS
+                AND deps.refclassid = 'pg_class'::REGCLASS
+                AND deps.deptype = 'a'
+        GROUP BY
+            map.kind,
+            schema,
+            name,
+            owner_id
     ), schemas AS (
         SELECT
-            'schemas'::TEXT AS objkind,
+            'schemas'::TEXT AS kind,
             nsp.nspname AS schema,
-            nsp.nspname AS objname,
-            nsp.nspowner AS owner_id
+            nsp.nspname AS name,
+            nsp.nspowner AS owner_id,
+            FALSE AS is_dependent
         FROM pg_namespace nsp
     ), combined AS (
         SELECT *
@@ -196,10 +168,11 @@ Q_GET_ALL_OBJECT_OWNERS = """
         FROM schemas
     )
     SELECT
-        co.objkind,
+        co.kind,
         co.schema,
-        co.objname,
-        t_owner.rolname AS owner
+        co.name,
+        t_owner.rolname AS owner,
+        co.is_dependent
     FROM combined AS co
     JOIN pg_authid t_owner
         ON co.owner_id = t_owner.OID
@@ -214,19 +187,6 @@ Q_GET_ALL_PERSONAL_SCHEMAS = """
         JOIN pg_authid auth
             ON  nsp.nspname = auth.rolname
     WHERE auth.rolcanlogin IS TRUE
-    ;
-    """
-
-Q_GET_ALL_SCHEMAS_AND_OWNERS = """
-    SELECT
-        nsp.nspname AS schema,
-        auth.rolname AS owner
-    FROM pg_namespace nsp
-    JOIN pg_authid auth
-        ON nsp.nspowner = auth.OID
-    WHERE
-        nsp.nspname NOT LIKE 'pg\_t%'
-    ORDER BY nsp.nspname
     ;
     """
 
@@ -247,7 +207,7 @@ PRIVILEGE_MAP = {
          },
 }
 
-ObjectInfo = collections.namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
+ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
 
 
 class DatabaseContext(object):
@@ -255,9 +215,10 @@ class DatabaseContext(object):
     has not already been fetched, fetch it (this is implemented via __getattribute__ below) """
 
     cacheables = {
+        'get_all_raw_object_attributes',
         'get_all_current_defaults',
         'get_all_current_nondefaults',
-        'get_all_object_owners',
+        'get_all_object_attributes',
         'get_all_role_attributes',
         'get_all_memberships',
         'get_all_nonschema_objects_and_owners',
@@ -433,37 +394,51 @@ class DatabaseContext(object):
         role_attributes = self.get_role_attributes(rolename)
         return role_attributes.get('rolsuper', False)
 
-    def get_all_object_owners(self):
+    def get_all_raw_object_attributes(self):
+        """
+        Fetch results for all object attributes.
+
+        The results are used in several subsequent methods, so having consistent results is
+        important. Thus, this helper method is here to ensure that we only run this query once.
+        """
+        ObjectAttributes = namedtuple('ObjectAttributes',
+                                      ['kind', 'schema', 'name', 'owner', 'is_dependent'])
+        common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
+        results = [ObjectAttributes(*row) for row in self.cursor.fetchall()]
+        return results
+
+    def get_all_object_attributes(self):
         """ Return a dict of the form:
             {objkindA: {
                 'schemaA': {
-                    'objnameA': ownerA,
-                    'objnameB': ownerB,
-                    }
+                    'objnameA': {
+                        'owner': ownerA,
+                        'is_dependent': False,
+                        },
+                    'objnameB': {
+                        'owner': ownerB,
+                        'is_dependent': True,
+                        },
+                    },
                 'schemaB': ...
                  ...
                 },
             objkindB:
-                ....
+                ...
             }
-        i.e. we can access an object's owner via output[objkind][schema][objname]
+        i.e. we can access an object's owner via output[objkind][schema][objname]['owner']
 
-        This structure is chosen to allow for looking up:
-            1) object ownership
-            2) all owners in a given schema
-            3) all objects in a given schema
+        This structure is chosen to match as closely as possible the structure of spec files
+        as we typically access this structure as we are building out or reading through a spec
         """
-        OwnerRow = namedtuple('OwnerRow',
-                              ['objkind', 'schema', 'objname', 'owner'])
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_OBJECT_OWNERS)
         all_object_owners = defaultdict(dict)
-        for i in self.cursor.fetchall():
-            row = OwnerRow(*i)
-            objkind_owners = all_object_owners[row.objkind]
+        for row in self.get_all_raw_object_attributes():
+            objkind_owners = all_object_owners[row.kind]
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.objname] = row.owner
+            objkind_owners[row.schema][row.name] = {'owner': row.owner,
+                                                    'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -474,8 +449,10 @@ class DatabaseContext(object):
 
     def get_all_schemas_and_owners(self):
         """ Return a dict of {schema_name: schema_owner} """
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_SCHEMAS_AND_OWNERS)
-        return {row['schema']: row['owner'] for row in self.cursor.fetchall()}
+        all_object_owners = self.get_all_object_attributes()
+        schemas_subdict = all_object_owners.get('schemas', {})
+        schema_owners = {k: v[k]['owner'] for k, v in schemas_subdict.items()}
+        return schema_owners
 
     def get_schema_owner(self, schema):
         all_schemas_and_owners = self.get_all_schemas_and_owners()
@@ -487,22 +464,24 @@ class DatabaseContext(object):
         return role_memberships
 
     def get_all_personal_schemas(self):
-        """ Return all personal schemas as a list """
+        """ Return all personal schemas as a set """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_PERSONAL_SCHEMAS)
         personal_schemas = set([i[0] for i in self.cursor.fetchall()])
         return personal_schemas
 
     def get_all_nonschema_objects_and_owners(self):
-        """ For all objkinds other than schemas return a dict of the form
-                {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
         """
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_NONSCHEMA_OBJECTS_AND_OWNERS)
+        For all objkinds other than schemas return a dict of the form
+            {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
 
-        schema_objects = collections.defaultdict(list)
-        for i in self.cursor.fetchall():
-            schema = i[0]
-            objinfo = ObjectInfo(*i[1:])
-            schema_objects[schema].append(objinfo)
+        This is primarily a helper for DatabaseContext.get_schema_objects so we have O(1)
+        schema object lookups instead of needing to iterate through all objects every time
+        """
+        schema_objects = defaultdict(list)
+        for row in self.get_all_raw_object_attributes():
+            if row.kind != 'schemas':
+                objinfo = ObjectInfo(row.kind, row.name, row.owner, row.is_dependent)
+                schema_objects[row.schema].append(objinfo)
 
         return schema_objects
 
@@ -511,9 +490,10 @@ class DatabaseContext(object):
         return all_objects_and_owners.get(schema, [])
 
     def is_schema_empty(self, schema, object_kind):
+        """ Determine if the schema is empty with regard to the object kind specified """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
-        for objkind, objname, _, _ in all_objects_and_owners.get(schema, []):
-            if objkind == object_kind:
+        for obj in all_objects_and_owners.get(schema, []):
+            if obj.kind == object_kind:
                 return False
 
         return True

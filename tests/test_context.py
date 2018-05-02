@@ -238,34 +238,34 @@ def test_get_role_objects_with_access(access, expected):
         # Role3 owns 1 table (2) and 0 sequences
         Q_CREATE_TABLE.format(ROLES[3], SCHEMAS[0], TABLES[2]),
     ])
-def test_get_all_object_owners(cursor):
+def test_get_all_object_attributes(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     expected = {
         'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[0]): ROLES[1],
-                quoted_object(SCHEMAS[0], TABLES[1]): ROLES[1],
-                quoted_object(SCHEMAS[0], TABLES[2]): ROLES[3],
+                quoted_object(SCHEMAS[0], TABLES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], TABLES[1]): {'owner': ROLES[1], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], TABLES[2]): {'owner': ROLES[3], 'is_dependent': False},
             }
         },
         'sequences': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], SEQUENCES[0]): ROLES[1],
-                quoted_object(SCHEMAS[0], SEQUENCES[1]): ROLES[2],
-                quoted_object(SCHEMAS[0], SEQUENCES[2]): ROLES[2],
+                quoted_object(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
+                quoted_object(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[2], 'is_dependent': False},
             }
         },
         'schemas': {
             SCHEMAS[0]: {
-                SCHEMAS[0]: ROLES[0],
+                SCHEMAS[0]: {'owner': ROLES[0], 'is_dependent': False},
             },
             'public': {
-                'public': 'postgres',
+                'public': {'owner': 'postgres', 'is_dependent': False},
             }
         }
     }
 
-    actual = dbcontext.get_all_object_owners()
+    actual = dbcontext.get_all_object_attributes()
 
     # We do this to avoid having to look at / filter out entries from
     # information_schema or pg_catalog
@@ -276,7 +276,7 @@ def test_get_all_object_owners(cursor):
 
     # Make sure that this data is cached for future use
     cursor.close()
-    actual_again = dbcontext.get_all_object_owners()
+    actual_again = dbcontext.get_all_object_attributes()
     assert actual_again == actual
 
 
@@ -466,3 +466,16 @@ def test_get_schema_objects_no_entry():
     }
     actual = dbcontext.get_schema_objects('key_not_in_response')
     assert actual == []
+
+
+def test_get_all_raw_object_attributes(cursor):
+    dbcontext = context.DatabaseContext(cursor, verbose=True)
+    raw_results = dbcontext.get_all_raw_object_attributes()
+    assert isinstance(raw_results, list)
+    assert len(raw_results) > 0
+    assert isinstance(raw_results[0], tuple)
+
+    # Make sure that this data is cached for future use
+    cursor.close()
+    raw_results_again = dbcontext.get_all_raw_object_attributes()
+    assert raw_results_again == raw_results
