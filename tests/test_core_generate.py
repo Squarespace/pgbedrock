@@ -745,3 +745,14 @@ def test_output_spec(capsys):
     core_generate.output_spec(spec)
     out, err = capsys.readouterr()
     assert out == expected
+
+
+@pytest.mark.parametrize("input_, expected", [
+    ([3, 1, 5, 2], [1, 2, 3, 5]),
+    (8, 8),
+    ('some text', 'some text'),
+    ({'a': 3, 'b': 'foo', 'c': []}, {'a': 3, 'b': 'foo', 'c': []}),
+    ({'a': [0, 6, 1], 'b': {'c': [8, 3, 1]}}, {'a': [0, 1, 6], 'b': {'c': [1, 3, 8]}}),
+])
+def test_sort_sublists(input_, expected):
+    assert core_generate.sort_sublists(input_) == expected
