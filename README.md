@@ -424,8 +424,8 @@ Once your PR has been merged into master:
       messages
     * `git tag x.x.x -F tag_message`
     * `git push --tags origin master`
-2. Run `make release-pypi`.
-3. Run `make release-quay`. This may require doing a docker login to quay first.
+2. Run `make release_pypi`.
+3. Run `make release_quay`. This may require doing a docker login to quay first.
 
 
 ## License
