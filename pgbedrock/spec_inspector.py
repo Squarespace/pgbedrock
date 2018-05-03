@@ -6,6 +6,7 @@ import jinja2
 import yaml
 
 from pgbedrock import common
+from pgbedrock import context
 
 
 DUPLICATE_ROLE_DEFINITIONS_ERR_MSG = 'Spec error: role(s) defined more than once: {}'
@@ -16,6 +17,12 @@ OBJECT_REF_READ_WRITE_ERR = (
     'Spec error: objects have been unnecessarily given both read and write privileges.'
     'pgbedrock automatically grants read access when write access is requested.\n\t{}'
 )
+UNDOCUMENTED_ROLES_MSG = ('Undocumented roles found: {}.\n'
+                          'Please add these roles to the spec file or manually remove '
+                          'them from the Postgres cluster')
+UNOWNED_SCHEMAS_MSG = ('Schemas found in database with no owner in spec: {}.\n'
+                       'Please add these schemas to the spec file or manually remove '
+                       'them from the Postgres cluster')
 VALIDATION_ERR_MSG = 'Spec error: role "{}", field "{}": {}'
 
 SPEC_SCHEMA_YAML = """
@@ -64,8 +71,8 @@ SPEC_SCHEMA_YAML = """
     """
 
 
-def check_for_multi_schema_owners(spec):
-    """Checks spec for schema with multiple owners."""
+def ensure_no_schema_owned_twice(spec):
+    """ Check spec for schemas with multiple owners. """
     error_messages = []
 
     globally_owned_schemas = defaultdict(list)
@@ -87,8 +94,10 @@ def check_for_multi_schema_owners(spec):
     return error_messages
 
 
-def check_read_write_obj_references(spec):
-    """Verifies objects aren't defined in both read and write privileges sections."""
+def ensure_no_redundant_privileges(spec):
+    """
+    Verify objects aren't defined in both read and write privilege sections for a given role.
+    """
     error_messages = []
 
     multi_refs = defaultdict(dict)
@@ -111,8 +120,9 @@ def check_read_write_obj_references(spec):
     return error_messages
 
 
-def detect_multiple_role_definitions(rendered_spec_template):
-    """Checks spec for roles declared multiple times.
+def ensure_no_duplicate_roles(rendered_spec_template):
+    """
+    Ensure that no roles are declared multiple times.
 
     In a spec template, if a role is declared more than once there exists a risk that the
     re-declaration will override the desired configuration. pgbedrock considers a config containing
@@ -122,13 +132,10 @@ def detect_multiple_role_definitions(rendered_spec_template):
     document tree.  Then, the root object's child nodes (which are the roles) are checked for
     duplicates.
 
-    Outputs a list of strings.
-
-    The decision to return a list of strings was deliberate, despite the fact that the length of the
-    list can at most be one. The reason for this is that the other spec verification functions
-    (check_for_multi_schema_owners and check_read_write_obj_references, verify_schema) also return a
-    list of strings.  This return signature consistency makes the code in the verify_spec function
-    cleaner.
+    Outputs a list of strings. The decision to return a list of strings was deliberate, despite the
+    fact that the length of the list can at most be one. The reason for this is that the other spec
+    verification functions also return a list of strings.  This return signature consistency makes
+    the code in the verify_spec function cleaner.
     """
     error_messages = []
     loader = yaml.loader.Loader(rendered_spec_template)
@@ -147,10 +154,80 @@ def detect_multiple_role_definitions(rendered_spec_template):
     return error_messages
 
 
-def load_spec(spec_path):
+def ensure_no_undocumented_roles(spec, dbcontext):
+    """
+    Ensure that all roles in the database are documented within the spec. This is done
+    (vs. having pbedrock assume it should delete these roles) because the roles may own schemas,
+    tables, functions, etc. There's enough going on that if the user just made a mistake by
+    forgetting to add a role to their spec then we've caused serious damage; better to throw an
+    error and ask the user to manually resolve this.
+    """
+    current_role_attributes = dbcontext.get_all_role_attributes()
+    spec_roles = set(spec.keys())
+    current_roles = set(current_role_attributes.keys())
+    undocumented_roles = current_roles.difference(spec_roles)
+
+    if undocumented_roles:
+        undocumented_roles_fmtd = '"' + '", "'.join(sorted(undocumented_roles)) + '"'
+        return [UNDOCUMENTED_ROLES_MSG.format(undocumented_roles_fmtd)]
+
+    return []
+
+
+def ensure_no_unowned_schemas(spec, dbcontext):
+    """
+    Ensure that all schemas in the database are documented within the spec. This is done
+    (vs. having pgbedrock assume it should delete these schemas) because the schema likely contains
+    tables, those tables may contain permissions, etc. There's enough going on that if the user
+    just made a mistake by forgetting to add a schema to their spec we've caused serious damage;
+    better to throw an error and ask the user to manually resolve this
+    """
+    current_schemas_and_owners = dbcontext.get_all_schemas_and_owners()
+    current_schemas = set(current_schemas_and_owners.keys())
+    spec_schemas = get_spec_schemas(spec)
+    undocumented_schemas = current_schemas.difference(spec_schemas)
+    if undocumented_schemas:
+        undocumented_schemas_fmtd = '"' + '", "'.join(sorted(undocumented_schemas)) + '"'
+        return [UNOWNED_SCHEMAS_MSG.format(undocumented_schemas_fmtd)]
+
+    return []
+
+
+def ensure_valid_schema(spec):
+    """ Ensure spec has no schema errors """
+    error_messages = []
+
+    schema = yaml.load(SPEC_SCHEMA_YAML)
+    v = cerberus.Validator(schema)
+    for rolename, config in spec.items():
+        if not config:
+            continue
+        v.validate(config)
+        for field, err_msg in v.errors.items():
+            error_messages.append(VALIDATION_ERR_MSG.format(rolename, field, err_msg[0]))
+
+    return error_messages
+
+
+def get_spec_schemas(spec):
+    """ Get all personal and non-personal schemas defined in the spec file """
+    spec_schemas = []
+    for rolename, config in spec.items():
+        config = config or {}
+        spec_schemas.extend(config.get('owns', {}).get('schemas', []))
+
+        if config.get('has_personal_schema'):
+            spec_schemas.append(rolename)
+
+    return set(spec_schemas)
+
+
+def load_spec(spec_path, cursor, verbose, attributes, memberships, ownerships, privileges):
+    """ Validate a spec passes various checks and, if so, return the loaded spec. """
     rendered_template = render_template(spec_path)
     spec = yaml.load(rendered_template)
-    verify_spec(rendered_template, spec)
+    verify_spec(rendered_template, spec, cursor, verbose, attributes, memberships, ownerships,
+                privileges)
     return spec
 
 
@@ -170,31 +247,27 @@ def render_template(path):
         return rendered
 
 
-def verify_schema(spec):
-    """Checks spec for schema errors."""
-    error_messages = []
-
-    schema = yaml.load(SPEC_SCHEMA_YAML)
-    v = cerberus.Validator(schema)
-    for rolename, config in spec.items():
-        if not config:
-            continue
-        v.validate(config)
-        for field, err_msg in v.errors.items():
-            error_messages.append(VALIDATION_ERR_MSG.format(rolename, field, err_msg[0]))
-
-    return error_messages
-
-
-def verify_spec(rendered_template, spec):
+def verify_spec(rendered_template, spec, cursor, verbose, attributes, memberships, ownerships,
+                privileges):
     assert isinstance(spec, dict)
+    dbcontext = context.DatabaseContext(cursor, verbose)
 
     error_messages = []
-    error_messages += detect_multiple_role_definitions(rendered_template)
-    verification_functions = (verify_schema,
-                              check_for_multi_schema_owners,
-                              check_read_write_obj_references)
-    for fn in verification_functions:
-        error_messages += fn(spec)
+    error_messages += ensure_valid_schema(spec)
+
+    # Having all roles represented exactly once is critical for all submodules
+    # so we check this regardless of which submodules are being used
+    error_messages += ensure_no_duplicate_roles(rendered_template)
+    error_messages += ensure_no_undocumented_roles(spec, dbcontext)
+
+    if ownerships:
+        error_messages += ensure_no_unowned_schemas(spec, dbcontext)
+        for objkind in context.PRIVILEGE_MAP.keys():
+            if objkind == 'schemas':
+                error_messages += ensure_no_schema_owned_twice(spec)
+
+    if privileges:
+        error_messages += ensure_no_redundant_privileges(spec)
+
     if error_messages:
         common.fail('\n'.join(error_messages))

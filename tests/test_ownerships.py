@@ -17,21 +17,6 @@ DUMMY = 'foo'
 
 @run_setup_sql([
     'DROP SCHEMA public',
-    'CREATE SCHEMA {}'.format(SCHEMAS[0]),
-    ])
-def test_analyze_schemas_with_undocumented_items(capsys, cursor):
-    spec = {'postgres': {'has_personal_schema': False}}
-
-    with pytest.raises(SystemExit):
-        own.analyze_schemas(spec, cursor, verbose=False)
-
-    # Undocumented schemas will come back double-quoted
-    missing_schemas = '"information_schema", "pg_catalog", "schema0"'
-    assert capsys.readouterr()[0] == own.UNDOCUMENTED_SCHEMAS_MSG.format(missing_schemas) + "\n"
-
-
-@run_setup_sql([
-    'DROP SCHEMA public',
     attributes.Q_CREATE_ROLE.format(ROLES[0]),
     attributes.Q_CREATE_ROLE.format(ROLES[1]),
     ])
@@ -65,24 +50,6 @@ def test_analyze_schemas_create_schemas(cursor):
         own.Q_CREATE_SCHEMA.format(SCHEMAS[1], ROLES[1]),
     ])
     assert set(actual) == expected
-
-
-def test_get_spec_schemas():
-    spec = {
-        ROLES[0]: {
-             'has_personal_schema': True,
-             'owns': {
-                 'schemas': [SCHEMAS[0]]
-             },
-        },
-        ROLES[1]: {
-             'owns': {
-                 'schemas': [SCHEMAS[1]]
-             },
-        }
-    }
-
-    assert own.get_spec_schemas(spec) == set([ROLES[0], SCHEMAS[0], SCHEMAS[1]])
 
 
 def test_init(mockdbcontext):

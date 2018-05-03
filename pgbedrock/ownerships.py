@@ -9,10 +9,6 @@ from pgbedrock.context import DatabaseContext
 
 logger = logging.getLogger(__name__)
 
-UNDOCUMENTED_SCHEMAS_MSG = ('Undocumented schemas found: {}.\n'
-                            'Please add these schemas to the spec file or manually remove '
-                            'them from the Postgres cluster')
-
 Q_CREATE_SCHEMA = 'CREATE SCHEMA "{}" AUTHORIZATION "{}";'
 Q_SET_SCHEMA_OWNER = 'ALTER SCHEMA "{}" OWNER TO "{}"; -- Previous owner: "{}"'
 Q_SET_OBJECT_OWNER = 'ALTER {} {} OWNER TO "{}"; -- Previous owner: "{}"'
@@ -21,7 +17,6 @@ Q_SET_OBJECT_OWNER = 'ALTER {} {} OWNER TO "{}"; -- Previous owner: "{}"'
 def analyze_schemas(spec, cursor, verbose):
     logger.debug('Starting analyze_schemas()')
     dbcontext = DatabaseContext(cursor, verbose)
-    fail_if_undocumented_schemas(spec, dbcontext)
 
     # We disable the progress bar when showing verbose output (using '' as our bar_template)
     # or # the bar will get lost in the # output
@@ -44,36 +39,6 @@ def analyze_schemas(spec, cursor, verbose):
                 all_sql_to_run += sql_to_run
 
         return all_sql_to_run
-
-
-def fail_if_undocumented_schemas(spec, dbcontext):
-    """
-    Refuse to continue if schemas are in the database but are not documented in spec. This is done
-    (vs. just deleting the schemas programmatically) because the schema likely contains tables,
-    those tables may contain permissions, etc. There's enough going on that if the user just made
-    a mistake by forgetting to add a schema to their spec we've caused serious damage; better to
-    ask them to manually resolve this
-    """
-    current_schemas_and_owners = dbcontext.get_all_schemas_and_owners()
-    current_schemas = set(current_schemas_and_owners.keys())
-    spec_schemas = get_spec_schemas(spec)
-    undocumented_schemas = current_schemas.difference(spec_schemas)
-    if undocumented_schemas:
-        undocumented_schemas_fmtd = '"' + '", "'.join(sorted(undocumented_schemas)) + '"'
-        common.fail(msg=UNDOCUMENTED_SCHEMAS_MSG.format(undocumented_schemas_fmtd))
-
-
-def get_spec_schemas(spec):
-    """ Get all personal and non-personal schemas defined in the spec file """
-    spec_schemas = []
-    for rolename, config in spec.items():
-        config = config or {}
-        spec_schemas.extend(config.get('owns', {}).get('schemas', []))
-
-        if config.get('has_personal_schema'):
-            spec_schemas.append(rolename)
-
-    return set(spec_schemas)
 
 
 class SchemaAnalyzer(object):

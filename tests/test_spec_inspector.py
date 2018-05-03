@@ -27,7 +27,7 @@ def test_verify_spec_fails_multiple_roles_own_schema(capsys):
                 - finance_documents
     """
     spec = yaml.load(spec_yaml)
-    errors = spec_inspector.check_for_multi_schema_owners(spec)
+    errors = spec_inspector.ensure_no_schema_owned_twice(spec)
     expected = spec_inspector.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('finance_documents', 'jfinance, jfauxnance')
     assert [expected] == errors
 
@@ -45,7 +45,7 @@ def test_verify_spec_fails_multiple_roles_own_schema_personal_schema(capsys):
                 - jfinance
     """
     spec = yaml.load(spec_yaml)
-    errors = spec_inspector.check_for_multi_schema_owners(spec)
+    errors = spec_inspector.ensure_no_schema_owned_twice(spec)
     expected = spec_inspector.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('jfinance', 'jfinance, jfauxnance')
     assert [expected] == errors
 
@@ -73,7 +73,7 @@ def test_verify_spec_fails_object_referenced_read_write(capsys):
     privilege_types = ('schemas', 'sequences', 'tables')
     for t in privilege_types:
         spec = yaml.load(spec_yaml.format(t))
-        errors = spec_inspector.check_read_write_obj_references(spec)
+        errors = spec_inspector.ensure_no_redundant_privileges(spec)
         err_string = "margerie: {'%s': ['big_bad']}" % t
         expected = spec_inspector.OBJECT_REF_READ_WRITE_ERR.format(err_string)
         assert [expected] == errors
@@ -96,7 +96,7 @@ def test_verify_spec_fails_role_defined_multiple_times(tmpdir, capsys):
                 - tupperwear
     """)
     rendered_template = spec_inspector.render_template(spec_path.strpath)
-    errors = spec_inspector.detect_multiple_role_definitions(rendered_template)
+    errors = spec_inspector.ensure_no_duplicate_roles(rendered_template)
     expected = spec_inspector.DUPLICATE_ROLE_DEFINITIONS_ERR_MSG.format('jfinance')
     assert [expected] == errors
 
@@ -110,7 +110,7 @@ def test_verify_spec_fails(capsys):
                 - flub
         """
     spec = yaml.load(spec_yaml)
-    errors = spec_inspector.verify_schema(spec)
+    errors = spec_inspector.ensure_valid_schema(spec)
     expected = spec_inspector.VALIDATION_ERR_MSG.format('fred', 'attribute', 'unknown field')
     assert expected == errors[0]
 
@@ -124,7 +124,7 @@ def test_verify_spec_succeeds(capsys):
         mark:
         """
     spec = yaml.load(spec_yaml)
-    errors = spec_inspector.verify_schema(spec)
+    errors = spec_inspector.ensure_valid_schema(spec)
     assert len(errors) == 0
 
 
@@ -205,3 +205,43 @@ def test_load_spec_fails_file_not_found(capsys):
 
     out, _ = capsys.readouterr()
     assert spec_inspector.FILE_OPEN_ERROR_MSG.format(path, '') in out
+
+
+def test_ensure_no_undocumented_roles(mockdbcontext):
+    mockdbcontext.get_all_role_attributes = lambda: {'foo': {}, 'bar': {}, 'baz': {}}
+    spec = {'baz': {}}
+    error_messages = spec_inspector.ensure_no_undocumented_roles(spec, mockdbcontext)
+    expected = spec_inspector.UNDOCUMENTED_ROLES_MSG.format('"bar", "foo"')
+    assert error_messages == [expected]
+
+
+def test_ensure_no_unowned_schemas(mockdbcontext):
+    mockdbcontext.get_all_schemas_and_owners = lambda: {'foo': {}, 'bar': {}, 'baz': {}}
+    spec = {
+        'qux': {
+            'owns': {
+                'schemas': ['baz'],
+            },
+        },
+    }
+    error_messages = spec_inspector.ensure_no_unowned_schemas(spec, mockdbcontext)
+    expected = spec_inspector.UNOWNED_SCHEMAS_MSG.format('"bar", "foo"')
+    assert error_messages == [expected]
+
+
+def test_get_spec_schemas():
+    spec = {
+        'role0': {
+             'has_personal_schema': True,
+             'owns': {
+                 'schemas': ['schemas0']
+             },
+        },
+        'role1': {
+             'owns': {
+                 'schemas': ['schemas1']
+             },
+        }
+    }
+
+    assert spec_inspector.get_spec_schemas(spec) == set(['role0', 'schemas0', 'schemas1'])

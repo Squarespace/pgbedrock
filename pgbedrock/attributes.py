@@ -12,9 +12,6 @@ from pgbedrock.context import DatabaseContext
 logger = logging.getLogger(__name__)
 
 
-UNDOCUMENTED_ROLES_MSG = ('Undocumented roles found: {}.\n'
-                          'Please add these roles to the spec file or manually remove '
-                          'them from the Postgres cluster')
 UNKNOWN_ATTRIBUTE_MSG = "Unknown attribute '{}' provided to ALTER ROLE"
 UNSUPPORTED_CHAR_MSG = 'Password for role "{}" contains an unsupported character: \' or "'
 
@@ -60,7 +57,6 @@ COLUMN_NAME_TO_KEYWORD = {v: k for k, v in PG_COLUMN_NAME.items()}
 def analyze_attributes(spec, cursor, verbose):
     logger.debug('Starting analyze_attributes()')
     dbcontext = DatabaseContext(cursor, verbose)
-    fail_if_undocumented_roles(spec, dbcontext)
 
     # We disable the progress bar when showing verbose output (using '' as our bar_template)
     # or # the bar will get lost in the # output
@@ -90,24 +86,6 @@ def analyze_attributes(spec, cursor, verbose):
 def create_md5_hash(rolename, value):
     salted_input = (value + rolename).encode('utf-8')
     return 'md5' + hashlib.md5(salted_input).hexdigest()
-
-
-def fail_if_undocumented_roles(spec, dbcontext):
-    """
-    Refuse to continue if roles are in the database cluster but are not documented in spec. This
-    is done (vs. just deleting the roles programmatically) because the roles may own schemas,
-    tables, functions, etc. There's enough going on that if the user just made a mistake by
-    forgetting to add a role to their spec then we've caused serious damage; it's safer to ask
-    them to manually resolve this.
-    """
-    current_role_attributes = dbcontext.get_all_role_attributes()
-    spec_roles = set(spec.keys())
-    current_roles = set(current_role_attributes.keys())
-    undocumented_roles = current_roles.difference(spec_roles)
-
-    if undocumented_roles:
-        undocumented_roles_fmtd = '"' + '", "'.join(sorted(undocumented_roles)) + '"'
-        common.fail(msg=UNDOCUMENTED_ROLES_MSG.format(undocumented_roles_fmtd))
 
 
 def is_valid_forever(val):

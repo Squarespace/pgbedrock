@@ -38,17 +38,6 @@ def roleconf(request, mockdbcontext):
     return roleconf
 
 
-def test_analyze_attributes_undocumented_items(capsys, cursor):
-    # test_user and postgres user already existed (1st is created by docker when it starts
-    # postgres; 2nd is a postgres default). We simply don't put them in the spec here so they seem
-    # unexpected to our app, then verify that it treats them as unexpected
-    with pytest.raises(SystemExit):
-        attr.analyze_attributes(spec={}, cursor=cursor, verbose=False)
-
-    expected_err_msg = attr.UNDOCUMENTED_ROLES_MSG.format('"postgres", "test_user"') + '\n'
-    assert capsys.readouterr()[0] == expected_err_msg
-
-
 @run_setup_sql([
     attr.Q_CREATE_ROLE.format(ROLE1),
     ])
