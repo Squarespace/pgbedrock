@@ -101,9 +101,11 @@ def test_add_schema_ownerships(mockdbcontext):
         # Personal schema
         'owner1': 'owner1',
 
-        # Would be personal schema but owner2 doesn't have 'can_login' within spec
+        # Would not show up in get_all_personal_schemas as can_login is False
         'owner2': 'owner2',
     }
+    mockdbcontext.get_all_personal_schemas = lambda: set(['owner1'])
+
     spec = {
         'owner1': {'can_login': True},
         'owner2': {},

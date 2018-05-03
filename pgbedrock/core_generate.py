@@ -74,10 +74,13 @@ def add_schema_ownerships(spec, dbcontext):
     objects in that schema that are not owned by the schema owner they will have their ownership
     changed (to be the same as the schema owner).
     """
+    personal_schemas = dbcontext.get_all_personal_schemas()
     schemas_and_owners = dbcontext.get_all_schemas_and_owners()
+
     for schema, owner in schemas_and_owners.items():
-        if schema == owner and spec[owner].get('can_login', False):
-            # This is (assumed to be) a personal schema. See docstring for implications
+        if schema in personal_schemas:
+            # Any schema where the owner is the same as the schema's name and the owner can
+            # log in is assumed to be a personal schema. See docstring for implications
             spec[owner]['has_personal_schema'] = True
         else:
             try:
