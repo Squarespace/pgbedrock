@@ -84,6 +84,9 @@ def tiny_spec(tmpdir):
                 - information_schema
                 - pg_catalog
                 - public
+            tables:
+                - information_schema.*
+                - pg_catalog.*
 
     test_user:
         can_login: yes

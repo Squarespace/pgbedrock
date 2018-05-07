@@ -36,6 +36,9 @@ def test_configure_no_changes_needed(tmpdir, capsys, db_config):
                 - information_schema
                 - pg_catalog
                 - public
+            tables:
+                - information_schema.*
+                - pg_catalog.*
 
     test_user:
         can_login: yes
@@ -123,6 +126,9 @@ def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_confi
                 - information_schema
                 - pg_catalog
                 - public
+            tables:
+                - information_schema.*
+                - pg_catalog.*
 
     test_user:
         can_login: yes
@@ -218,6 +224,9 @@ def test_configure_schema_role_has_dash(tmpdir, capsys, db_config):
                 - information_schema
                 - pg_catalog
                 - public
+            tables:
+                - information_schema.*
+                - pg_catalog.*
 
     test_user:
         can_login: yes

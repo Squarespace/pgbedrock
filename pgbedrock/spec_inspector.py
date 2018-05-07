@@ -8,22 +8,32 @@ import yaml
 from pgbedrock import common
 from pgbedrock import context
 
-
-DUPLICATE_ROLE_DEFINITIONS_ERR_MSG = 'Spec error: role(s) defined more than once: {}'
+DEPENDENT_OBJECTS_MSG = ('Spec error: Ownership listed for dependent {objkind}: {dep_objs}\n'
+                         'Ownership for a dependent object derives from the object is depends '
+                         'on. Please remove these objects from the ownership sections within '
+                         'your spec file')
+DUPLICATE_ROLE_DEFINITIONS_ERR_MSG = 'Spec error: Role(s) defined more than once: {}'
 FILE_OPEN_ERROR_MSG = "Unable to open file '{}':\n{}"
-MISSING_ENVVAR_MSG = "Required environment variable not found:\n{}"
-MULTIPLE_SCHEMA_OWNER_ERR_MSG = 'Spec error: schema "{}" owned by more than one role: {}'
+MISSING_ENVVAR_MSG = "Spec error: Required environment variable not found:\n{}"
+MULTIPLE_SCHEMA_OWNER_ERR_MSG = 'Spec error: Schema "{}" owned by multiple roles: {}'
+MULTIPLE_OBJKIND_OWNER_ERR_MSG = 'Spec error: {} "{}" owned by multiple roles: {}'
 OBJECT_REF_READ_WRITE_ERR = (
     'Spec error: objects have been unnecessarily given both read and write privileges.'
     'pgbedrock automatically grants read access when write access is requested.\n\t{}'
 )
-UNDOCUMENTED_ROLES_MSG = ('Undocumented roles found: {}.\n'
+UNKNOWN_OBJECTS_MSG = ('Spec error: Unknown {objkind} found: {unknown_objects}\n'
+                       'Please manually add these {objkind} to the database or '
+                       'remove them from the spec file')
+UNOWNED_OBJECTS_MSG = ('Spec error: Unowned {objkind} found: {unowned_objects}\n'
+                       'Please add these {objkind} to the spec file or manually remove '
+                       'them from the Postgres cluster')
+UNDOCUMENTED_ROLES_MSG = ('Spec error: Undocumented roles found: {}.\n'
                           'Please add these roles to the spec file or manually remove '
                           'them from the Postgres cluster')
-UNOWNED_SCHEMAS_MSG = ('Schemas found in database with no owner in spec: {}.\n'
+UNOWNED_SCHEMAS_MSG = ('Spec error: Schemas found in database with no owner in spec: {}\n'
                        'Please add these schemas to the spec file or manually remove '
                        'them from the Postgres cluster')
-VALIDATION_ERR_MSG = 'Spec error: role "{}", field "{}": {}'
+VALIDATION_ERR_MSG = 'Spec error: Role "{}", field "{}": {}'
 
 SPEC_SCHEMA_YAML = """
     can_login:
@@ -45,6 +55,16 @@ SPEC_SCHEMA_YAML = """
         type: list
         schema:
             type: string
+    owns:
+        type: dict
+        allowed:
+            - schemas
+            - tables
+            - sequences
+        valueschema:
+            type: list
+            schema:
+                type: string
     privileges:
         type: dict
         allowed:
@@ -60,35 +80,57 @@ SPEC_SCHEMA_YAML = """
                 type: list
                 schema:
                     type: string
-    owns:
-        type: dict
-        allowed:
-            - schemas
-        valueschema:
-            type: list
-            schema:
-                type: string
     """
+
+
+def ensure_no_object_owned_twice(spec, dbcontext, objkind):
+    """ Check spec for objects of objkind with multiple owners. """
+    all_db_objects = dbcontext.get_all_object_attributes().get(objkind, dict())
+
+    object_ownerships = defaultdict(list)
+    for rolename, config in spec.items():
+        if not config or not config.get('owns') or not config['owns'].get(objkind):
+            continue
+
+        role_owned_objects = config['owns'][objkind]
+        for objname in role_owned_objects:
+            if objname.endswith('.*'):
+                schema = objname[:-2]
+                schema_objects = all_db_objects.get(schema, dict())
+                nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+                for obj in nondependent_objects:
+                    object_ownerships[obj].append(rolename)
+            else:
+                object_ownerships[objname].append(rolename)
+
+    error_messages = []
+    for objname, owners in object_ownerships.items():
+        if len(owners) > 1:
+            owners_formatted = ", ".join(sorted(owners))
+            error_messages.append(MULTIPLE_OBJKIND_OWNER_ERR_MSG.format(objkind[:-1].capitalize(),
+                                                                        objname, owners_formatted))
+
+    return error_messages
 
 
 def ensure_no_schema_owned_twice(spec):
     """ Check spec for schemas with multiple owners. """
-    error_messages = []
-
-    globally_owned_schemas = defaultdict(list)
-    for role, config in spec.items():
+    schema_ownerships = defaultdict(list)
+    for rolename, config in spec.items():
         if not config:
             continue
         if config.get('has_personal_schema'):
-            # indicates a role has a personal schema with its same name
-            globally_owned_schemas[role].append(role)
+            # Indicates a role has a personal schema with its same name
+            schema_ownerships[rolename].append(rolename)
         if config.get('owns') and config['owns'].get('schemas'):
             role_owned_schemas = config['owns']['schemas']
             for schema in role_owned_schemas:
-                globally_owned_schemas[schema].append(role)
-    for schema, owners in globally_owned_schemas.items():
+                schema_ownerships[schema].append(rolename)
+
+    error_messages = []
+    for schema, owners in schema_ownerships.items():
         if len(owners) > 1:
-            owners_formatted = ", ".join(owners)
+            owners_formatted = ", ".join(sorted(owners))
             error_messages.append(MULTIPLE_SCHEMA_OWNER_ERR_MSG.format(schema, owners_formatted))
 
     return error_messages
@@ -98,10 +140,8 @@ def ensure_no_redundant_privileges(spec):
     """
     Verify objects aren't defined in both read and write privilege sections for a given role.
     """
-    error_messages = []
-
     multi_refs = defaultdict(dict)
-    for role, config in spec.items():
+    for rolename, config in spec.items():
         if config and config.get('privileges'):
             for obj in config['privileges']:
                 try:
@@ -109,15 +149,15 @@ def ensure_no_redundant_privileges(spec):
                     writes = set(config['privileges'][obj]['write'])
                     duplicates = reads.intersection(writes)
                     if duplicates:
-                        multi_refs[role][obj] = list(duplicates)
+                        multi_refs[rolename][obj] = list(duplicates)
                 except KeyError:
                     continue
     if multi_refs:
         multi_ref_strings = ["%s: %s" % (k, v) for k, v in multi_refs.items()]
         multi_ref_err_string = "\n\t".join(multi_ref_strings)
-        error_messages.append(OBJECT_REF_READ_WRITE_ERR.format(multi_ref_err_string))
+        return [OBJECT_REF_READ_WRITE_ERR.format(multi_ref_err_string)]
 
-    return error_messages
+    return []
 
 
 def ensure_no_duplicate_roles(rendered_spec_template):
@@ -137,7 +177,6 @@ def ensure_no_duplicate_roles(rendered_spec_template):
     verification functions also return a list of strings.  This return signature consistency makes
     the code in the verify_spec function cleaner.
     """
-    error_messages = []
     loader = yaml.loader.Loader(rendered_spec_template)
     document_tree = loader.get_single_node()
     if document_tree is None:
@@ -148,10 +187,10 @@ def ensure_no_duplicate_roles(rendered_spec_template):
         role_definitions[node[0].value] += 1
     multi_defined_roles = [k for k, v in role_definitions.items() if v > 1]
     if multi_defined_roles:
-        error_message = " ,".join(multi_defined_roles)
-        error_messages = [DUPLICATE_ROLE_DEFINITIONS_ERR_MSG.format(error_message)]
+        multi_roles_fmtd = " ,".join(multi_defined_roles)
+        return [DUPLICATE_ROLE_DEFINITIONS_ERR_MSG.format(multi_roles_fmtd)]
 
-    return error_messages
+    return []
 
 
 def ensure_no_undocumented_roles(spec, dbcontext):
@@ -174,6 +213,61 @@ def ensure_no_undocumented_roles(spec, dbcontext):
     return []
 
 
+def ensure_no_missing_objects(spec, dbcontext, objkind):
+    """
+    Ensure that all objects of kind objkind in the database are documented within the spec, and
+    vice versa. This is done for two reasons:
+
+    Object defined in database but not in spec
+        In this case, pgbedrock could delete the object, but this is hard-to-reverse. If the user
+        happened to just forget to document something then a table could be dropped, etc. It's
+        better to throw an error and ask the user to manually resolve this.
+
+    Object defined in spec but not in database
+        Similarly, if a object is defined in the spec but not in the database it is unclear what
+        pgbedrock should do. It can't create the object as it doesn't know the DDL that the object
+        should have. The only real option here is to alert the user to the mismatch and ask them to
+        resolve it.
+    """
+    db_objects = set()
+    for obj in dbcontext.get_all_raw_object_attributes():
+        if obj.kind == objkind and not obj.is_dependent:
+            db_objects.add(obj.name)
+
+    db_objects_by_schema = dbcontext.get_all_object_attributes().get(objkind, dict())
+    spec_objects = set()
+    for config in spec.values():
+        if not config or not config.get('owns') or not config['owns'].get(objkind):
+            continue
+
+        role_owned_objects = config['owns'][objkind]
+        for objname in role_owned_objects:
+            if objname.endswith('.*'):
+                schema = objname[:-2]
+                schema_objects = db_objects_by_schema.get(schema, dict())
+                nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+                for obj in nondependent_objects:
+                    spec_objects.add(obj)
+            else:
+                spec_objects.add(objname)
+
+    error_messages = []
+
+    not_in_db = spec_objects.difference(db_objects)
+    if not_in_db:
+        unknown_objects = ', '.join(sorted(not_in_db))
+        msg = UNKNOWN_OBJECTS_MSG.format(objkind=objkind, unknown_objects=unknown_objects)
+        error_messages.append(msg)
+
+    not_in_spec = db_objects.difference(spec_objects)
+    if not_in_spec:
+        unowned_objects = ', '.join(sorted(not_in_spec))
+        msg = UNOWNED_OBJECTS_MSG.format(objkind=objkind, unowned_objects=unowned_objects)
+        error_messages.append(msg)
+
+    return error_messages
+
+
 def ensure_no_unowned_schemas(spec, dbcontext):
     """
     Ensure that all schemas in the database are documented within the spec. This is done
@@ -189,6 +283,36 @@ def ensure_no_unowned_schemas(spec, dbcontext):
     if undocumented_schemas:
         undocumented_schemas_fmtd = '"' + '", "'.join(sorted(undocumented_schemas)) + '"'
         return [UNOWNED_SCHEMAS_MSG.format(undocumented_schemas_fmtd)]
+
+    return []
+
+
+def ensure_no_dependent_object_is_owned(spec, dbcontext, objkind):
+    all_db_objects = dbcontext.get_all_object_attributes().get(objkind, dict())
+    owned_dependent_objects = []
+    for rolename, config in spec.items():
+        if not config or not config.get('owns') or not config['owns'].get(objkind):
+            continue
+
+        role_owned_objects = config['owns'][objkind]
+        for objname in role_owned_objects:
+            if objname.endswith('.*'):
+                continue
+
+            schema = objname.split('.')[0]
+            try:
+                obj_is_dependent = all_db_objects[schema][objname]['is_dependent']
+            except KeyError:
+                # This object is missing in the db; that condition already being checked elsewhere
+                continue
+
+            if obj_is_dependent:
+                owned_dependent_objects.append(objname)
+
+    if owned_dependent_objects:
+        dep_objs = ', '.join(sorted(owned_dependent_objects))
+        msg = DEPENDENT_OBJECTS_MSG.format(objkind=objkind, dep_objs=dep_objs)
+        return [msg]
 
     return []
 
@@ -261,10 +385,16 @@ def verify_spec(rendered_template, spec, cursor, verbose, attributes, membership
     error_messages += ensure_no_undocumented_roles(spec, dbcontext)
 
     if ownerships:
-        error_messages += ensure_no_unowned_schemas(spec, dbcontext)
         for objkind in context.PRIVILEGE_MAP.keys():
             if objkind == 'schemas':
+                error_messages += ensure_no_unowned_schemas(spec, dbcontext)
                 error_messages += ensure_no_schema_owned_twice(spec)
+            else:
+                # We run each of these functions once per object kind as it is possible that
+                # two objects of different kinds could have the same name in the same schema
+                error_messages += ensure_no_missing_objects(spec, dbcontext, objkind)
+                error_messages += ensure_no_object_owned_twice(spec, dbcontext, objkind)
+                error_messages += ensure_no_dependent_object_is_owned(spec, dbcontext, objkind)
 
     if privileges:
         error_messages += ensure_no_redundant_privileges(spec)
