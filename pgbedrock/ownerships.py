@@ -20,7 +20,7 @@ def analyze_ownerships(spec, cursor, verbose):
     # We disable the progress bar when showing verbose output (using '' as our bar_template)
     # or # the bar will get lost in the # output
     bar_template = '' if verbose else common.PROGRESS_TEMPLATE
-    with click.progressbar(spec.items(), label='Analyzing schemas:    ', bar_template=bar_template,
+    with click.progressbar(spec.items(), label='Analyzing ownerships: ', bar_template=bar_template,
                            show_eta=False, item_show_func=common.item_show_func) as all_roles:
         all_sql_to_run = []
         for rolename, config in all_roles:
@@ -40,8 +40,55 @@ def analyze_ownerships(spec, cursor, verbose):
                                                     dbcontext=dbcontext,
                                                     is_personal_schema=False).analyze()
                         all_sql_to_run += sql_to_run
+                else:
+                    for objname in objects_to_own:
+                        sql_to_run = NonschemaAnalyzer(rolename=rolename, objname=objname,
+                                                       objkind=objkind, dbcontext=dbcontext).analyze()
+                        all_sql_to_run += sql_to_run
 
         return all_sql_to_run
+
+
+class NonschemaAnalyzer(object):
+    """
+    Analyze one object and determine (via .analyze()) any SQL statements that are
+    necessary to make sure that the object has the correct owner.
+
+    If the objname is schema.* then ownership for each of the objects (of kind objkind)
+    in that schema will be verified and changed if necessary.
+    """
+    def __init__(self, rolename, objname, objkind, dbcontext):
+        self.rolename = rolename
+        self.objname = objname
+        self.objkind = objkind
+        self.dbcontext = dbcontext
+        self.sql_to_run = []
+
+    def expand_schema_objects(self, schema):
+        """ Get all non-dependent objects of kind objkind within the specified schema """
+        all_objkind_objects = self.dbcontext.get_all_object_attributes().get(self.objkind, dict())
+        schema_objects = all_objkind_objects.get(schema, dict())
+        nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+        return nondependent_objects
+
+    def analyze(self):
+        schema = self.objname.split('.')[0]
+
+        if self.objname.endswith('.*'):
+            objects_to_manage = self.expand_schema_objects(schema)
+        else:
+            objects_to_manage = [self.objname]
+
+        all_object_attributes = self.dbcontext.get_all_object_attributes()
+        for objname in objects_to_manage:
+            current_owner = all_object_attributes[self.objkind][schema][objname]['owner']
+            if current_owner != self.rolename:
+                obj_kind_singular = self.objkind.upper()[:-1]
+                query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname, self.rolename,
+                                                  current_owner)
+                self.sql_to_run.append(query)
+
+        return self.sql_to_run
 
 
 class SchemaAnalyzer(object):
