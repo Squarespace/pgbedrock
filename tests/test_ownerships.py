@@ -1,5 +1,3 @@
-import pytest
-
 from conftest import quoted_object, run_setup_sql
 from pgbedrock import ownerships as own
 from pgbedrock import attributes, privileges
@@ -20,7 +18,7 @@ DUMMY = 'foo'
     attributes.Q_CREATE_ROLE.format(ROLES[0]),
     attributes.Q_CREATE_ROLE.format(ROLES[1]),
     ])
-def test_analyze_schemas_create_schemas(cursor):
+def test_analyze_ownerships_create_schemas(cursor):
     spec = {
         ROLES[0]: {
             'has_personal_schema': True,
@@ -42,7 +40,7 @@ def test_analyze_schemas_create_schemas(cursor):
             },
         },
     }
-    actual = own.analyze_schemas(spec, cursor, verbose=False)
+    actual = own.analyze_ownerships(spec, cursor, verbose=False)
 
     expected = set([
         own.Q_CREATE_SCHEMA.format(ROLES[0], ROLES[0]),

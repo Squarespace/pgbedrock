@@ -1,4 +1,3 @@
-import copy
 import logging
 
 import click
@@ -14,8 +13,8 @@ Q_SET_SCHEMA_OWNER = 'ALTER SCHEMA "{}" OWNER TO "{}"; -- Previous owner: "{}"'
 Q_SET_OBJECT_OWNER = 'ALTER {} {} OWNER TO "{}"; -- Previous owner: "{}"'
 
 
-def analyze_schemas(spec, cursor, verbose):
-    logger.debug('Starting analyze_schemas()')
+def analyze_ownerships(spec, cursor, verbose):
+    logger.debug('Starting analyze_ownerships()')
     dbcontext = DatabaseContext(cursor, verbose)
 
     # We disable the progress bar when showing verbose output (using '' as our bar_template)
@@ -25,28 +24,33 @@ def analyze_schemas(spec, cursor, verbose):
                            show_eta=False, item_show_func=common.item_show_func) as all_roles:
         all_sql_to_run = []
         for rolename, config in all_roles:
-            config = config or {}
-            ownership = config.get('owns', {})
-            schemas = copy.deepcopy(ownership.get('schemas', []))
-            has_personal_schema = config.get('has_personal_schema')
-            if has_personal_schema:
-                schemas.append(rolename)
+            if not config:
+                continue
 
-            for schema in schemas:
-                is_personal_schema = (has_personal_schema and (schema == rolename))
-                sql_to_run = SchemaAnalyzer(rolename, schema, dbcontext=dbcontext,
-                                            is_personal_schema=is_personal_schema).analyze()
+            if config.get('has_personal_schema'):
+                sql_to_run = SchemaAnalyzer(rolename=rolename, schema=rolename,
+                                            dbcontext=dbcontext, is_personal_schema=True).analyze()
                 all_sql_to_run += sql_to_run
+
+            ownerships = config.get('owns', {})
+            for objkind, objects_to_own in ownerships.items():
+                if objkind == 'schemas':
+                    for schema in objects_to_own:
+                        sql_to_run = SchemaAnalyzer(rolename=rolename, schema=schema,
+                                                    dbcontext=dbcontext,
+                                                    is_personal_schema=False).analyze()
+                        all_sql_to_run += sql_to_run
 
         return all_sql_to_run
 
 
 class SchemaAnalyzer(object):
-    """ Analyze one schema and determine (via .analyze()) any SQL statements that are
+    """
+    Analyze one schema and determine (via .analyze()) any SQL statements that are
     necessary to make sure that the schema exists, it has the correct owner, and if it is a
     personal schema that all objects in it (and that we track, i.e. the keys to the privileges.py
-    modules's PRIVILEGE_MAP) are owned by the correct schema owner """
-
+    modules's PRIVILEGE_MAP) are owned by the correct schema owner
+    """
     def __init__(self, rolename, schema, dbcontext, is_personal_schema=False):
         self.sql_to_run = []
         self.rolename = common.check_name(rolename)

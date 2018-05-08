@@ -8,7 +8,7 @@ from pgbedrock import LOG_FORMAT
 from pgbedrock import common
 from pgbedrock.attributes import analyze_attributes
 from pgbedrock.memberships import analyze_memberships
-from pgbedrock.ownerships import analyze_schemas
+from pgbedrock.ownerships import analyze_ownerships
 from pgbedrock.privileges import analyze_privileges
 from pgbedrock.spec_inspector import load_spec
 
@@ -142,7 +142,7 @@ def configure(spec_path, host, port, user, password, dbname, prompt, attributes,
 
     if ownerships:
         sql_to_run.append(create_divider('ownerships'))
-        module_sql = analyze_schemas(spec, cursor, verbose)
+        module_sql = analyze_ownerships(spec, cursor, verbose)
         run_module_sql(module_sql, cursor, verbose)
         sql_to_run.extend(module_sql)
 
