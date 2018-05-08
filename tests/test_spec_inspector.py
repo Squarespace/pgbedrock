@@ -123,6 +123,36 @@ def test_ensure_no_object_owned_twice_schema_expansion_works(mockdbcontext):
     assert set(errors) == expected
 
 
+def test_ensure_no_object_owned_twice_personal_schemas_expanded(mockdbcontext):
+    mockdbcontext.get_all_object_attributes = lambda: {
+        'tables': {
+            'role0': {
+                'role0."table0"': {'owner': 'role0', 'is_dependent': False},
+                'role0."table1"': {'owner': 'role0', 'is_dependent': False},
+                'role0."table2"': {'owner': 'role0', 'is_dependent': False},
+            },
+        },
+    }
+    spec_yaml = """
+    role0:
+        has_personal_schema: true
+
+    role1:
+        owns:
+            tables:
+                # Ensure function can handle some objects being quoted and some not
+                - role0."table0"
+                - role0.table1
+    """
+    spec = yaml.load(spec_yaml)
+    errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
+    expected = set([
+        spec_inspector.MULTIPLE_OBJKIND_OWNER_ERR_MSG.format('Table', 'role0."table0"', 'role0, role1'),
+        spec_inspector.MULTIPLE_OBJKIND_OWNER_ERR_MSG.format('Table', 'role0."table1"', 'role0, role1')
+    ])
+    assert set(errors) == expected
+
+
 def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
         ObjectAttributes('tables', 'schema0', 'schema0."table1"', 'owner1', False),
@@ -186,6 +216,28 @@ def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
     expected = spec_inspector.UNOWNED_OBJECTS_MSG.format(objkind='tables',
                                                          unowned_objects='schema0."table2", schema0."table4"')
     assert errors == [expected]
+
+
+def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
+    mockdbcontext.get_all_raw_object_attributes = lambda: {
+        ObjectAttributes('tables', 'role0', 'role0."table1"', 'role0', False),
+        ObjectAttributes('tables', 'role0', 'role0."table2"', 'role0', False),
+    }
+    mockdbcontext.get_all_object_attributes = lambda: {
+        'tables': {
+            'role0': {
+                'role0."table1"': {'owner': 'role0', 'is_dependent': False},
+                'role0."table2"': {'owner': 'role0', 'is_dependent': False},
+            },
+        },
+    }
+    spec_yaml = """
+    role0:
+        has_personal_schema: true
+    """
+    spec = yaml.load(spec_yaml)
+    errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
+    assert errors == []
 
 
 def test_ensure_no_missing_objects_schema_expansion_works(mockdbcontext):

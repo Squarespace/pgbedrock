@@ -89,7 +89,16 @@ def ensure_no_object_owned_twice(spec, dbcontext, objkind):
 
     object_ownerships = defaultdict(list)
     for rolename, config in spec.items():
-        if not config or not config.get('owns') or not config['owns'].get(objkind):
+        if not config:
+            continue
+
+        if config.get('has_personal_schema'):
+            schema_objects = all_db_objects.get(rolename, dict())
+            nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+            for obj in nondependent_objects:
+                object_ownerships[obj].append(rolename)
+
+        if not config.get('owns') or not config['owns'].get(objkind):
             continue
 
         role_owned_objects = config['owns'][objkind]
@@ -237,8 +246,17 @@ def ensure_no_missing_objects(spec, dbcontext, objkind):
 
     db_objects_by_schema = dbcontext.get_all_object_attributes().get(objkind, dict())
     spec_objects = set()
-    for config in spec.values():
-        if not config or not config.get('owns') or not config['owns'].get(objkind):
+    for rolename, config in spec.items():
+        if not config:
+            continue
+
+        if config.get('has_personal_schema'):
+            schema_objects = db_objects_by_schema.get(rolename, dict())
+            nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+            for obj in nondependent_objects:
+                spec_objects.add(obj)
+
+        if not config.get('owns') or not config['owns'].get(objkind):
             continue
 
         role_owned_objects = config['owns'][objkind]
