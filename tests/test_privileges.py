@@ -225,16 +225,6 @@ def test_analyze_privileges_skips_superuser(cursor):
     assert actual == expected
 
 
-@pytest.mark.parametrize('input, expected', [
-    ('myschema.myschema.mytable', 'myschema."myschema.mytable"'),
-    ('myschema."myschema.mytable"', 'myschema."myschema.mytable"'),
-    ('myschema.mytable', 'myschema."mytable"'),
-    ('unqualified', 'unqualified'),
-])
-def test_ensure_quoted_identifier(input, expected):
-    assert privs.ensure_quoted_identifier(input) == expected
-
-
 @pytest.mark.parametrize('object_kind', privs.PRIVILEGE_MAP.keys())
 def test_init_default_acl_possible(object_kind, mockdbcontext):
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind=object_kind,

@@ -101,14 +101,15 @@ def ensure_no_object_owned_twice(spec, dbcontext, objkind):
                 for obj in nondependent_objects:
                     object_ownerships[obj].append(rolename)
             else:
-                object_ownerships[objname].append(rolename)
+                quoted_objname = common.ensure_quoted_identifier(objname)
+                object_ownerships[quoted_objname].append(rolename)
 
     error_messages = []
-    for objname, owners in object_ownerships.items():
+    for quoted_objname, owners in object_ownerships.items():
         if len(owners) > 1:
             owners_formatted = ", ".join(sorted(owners))
             error_messages.append(MULTIPLE_OBJKIND_OWNER_ERR_MSG.format(objkind[:-1].capitalize(),
-                                                                        objname, owners_formatted))
+                                                                        quoted_objname, owners_formatted))
 
     return error_messages
 
@@ -249,7 +250,8 @@ def ensure_no_missing_objects(spec, dbcontext, objkind):
                 for obj in nondependent_objects:
                     spec_objects.add(obj)
             else:
-                spec_objects.add(objname)
+                quoted_objname = common.ensure_quoted_identifier(objname)
+                spec_objects.add(quoted_objname)
 
     error_messages = []
 
@@ -300,14 +302,15 @@ def ensure_no_dependent_object_is_owned(spec, dbcontext, objkind):
                 continue
 
             schema = objname.split('.')[0]
+            quoted_objname = common.ensure_quoted_identifier(objname)
             try:
-                obj_is_dependent = all_db_objects[schema][objname]['is_dependent']
+                obj_is_dependent = all_db_objects[schema][quoted_objname]['is_dependent']
             except KeyError:
                 # This object is missing in the db; that condition already being checked elsewhere
                 continue
 
             if obj_is_dependent:
-                owned_dependent_objects.append(objname)
+                owned_dependent_objects.append(quoted_objname)
 
     if owned_dependent_objects:
         dep_objs = ', '.join(sorted(owned_dependent_objects))
