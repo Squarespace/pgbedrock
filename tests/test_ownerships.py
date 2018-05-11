@@ -54,8 +54,8 @@ def test_analyze_ownerships_create_schemas(cursor):
 
     # Create tables in SCHEMAS[0], some of which aren't owned by ROLES[0]
     Q_CREATE_TABLE.format(ROLES[0], SCHEMAS[0], TABLES[0]),
-    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[1]),  #
-    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[2]),  #
+    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[1]),
+    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[2]),
     Q_CREATE_TABLE.format(ROLES[0], SCHEMAS[0], TABLES[3]),
 
     # Create two sequences in SCHEMAS[1], one of which isn't owned by ROLES[1]
@@ -102,8 +102,8 @@ def test_analyze_ownerships_nonschemas(cursor):
 
     # Create tables in SCHEMAS[0], some of which aren't owned by ROLES[0]
     Q_CREATE_TABLE.format(ROLES[0], SCHEMAS[0], TABLES[0]),
-    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[1]),  #
-    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[2]),  #
+    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[1]),
+    Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[2]),
     Q_CREATE_TABLE.format(ROLES[0], SCHEMAS[0], TABLES[3]),
 
     # Create two sequences in SCHEMAS[1], one of which isn't owned by ROLES[1]
