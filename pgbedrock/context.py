@@ -208,6 +208,8 @@ PRIVILEGE_MAP = {
 }
 
 ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
+ObjectAttributes = namedtuple('ObjectAttributes',
+                              ['kind', 'schema', 'name', 'owner', 'is_dependent'])
 
 
 class DatabaseContext(object):
@@ -401,8 +403,6 @@ class DatabaseContext(object):
         The results are used in several subsequent methods, so having consistent results is
         important. Thus, this helper method is here to ensure that we only run this query once.
         """
-        ObjectAttributes = namedtuple('ObjectAttributes',
-                                      ['kind', 'schema', 'name', 'owner', 'is_dependent'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
         results = [ObjectAttributes(*row) for row in self.cursor.fetchall()]
         return results

@@ -64,8 +64,9 @@ def add_memberships(spec, dbcontext):
     return spec
 
 
-def add_ownerships(spec, dbcontext):
-    """ Add object ownerships to an existing spec
+def add_schema_ownerships(spec, dbcontext):
+    """
+    Add schema ownerships to an existing spec
 
     One set of assumptions is made here: if a schema's name is the same as its owner and that
     owner can login, then the schema is assumed to be a personal schema. This is an assumption
@@ -73,19 +74,84 @@ def add_ownerships(spec, dbcontext):
     objects in that schema that are not owned by the schema owner they will have their ownership
     changed (to be the same as the schema owner).
     """
+    personal_schemas = dbcontext.get_all_personal_schemas()
     schemas_and_owners = dbcontext.get_all_schemas_and_owners()
+
     for schema, owner in schemas_and_owners.items():
-        if schema == owner and spec[owner].get('can_login', False):
-            # This is (assumed to be) a personal schema. See docstring for implications
+        if schema in personal_schemas:
+            # Any schema where the owner is the same as the schema's name and the owner can
+            # log in is assumed to be a personal schema. See docstring for implications
             spec[owner]['has_personal_schema'] = True
         else:
-            try:
-                spec[owner]['owns']['schemas'].append(schema)
-            except KeyError:
-                spec[owner]['owns'] = {
-                    'schemas': [schema]
-                }
+            if 'owns' not in spec[owner]:
+                spec[owner]['owns'] = {'schemas': []}
+            elif 'schemas' not in spec[owner]['owns']:
+                spec[owner]['owns']['schemas'] = []
 
+            spec[owner]['owns']['schemas'].append(schema)
+
+    return spec
+
+
+def add_nonschema_ownerships(spec, dbcontext, objkind):
+    """
+    Add non-schema ownerships for a specific object kind (e.g. tables, sequences, etc.) to an
+    existing spec.
+
+    Objects that are dependent on other objects are skipped as we cannot configure their ownership;
+    their ownership is tied to the object they depend on. Additionally, objects in personal schemas
+    are skipped as they are managed by ownerships.py as part of the personal schema ownership.
+    """
+    personal_schemas = dbcontext.get_all_personal_schemas()
+    all_objects_and_owners = dbcontext.get_all_object_attributes()
+    objects_and_owners = all_objects_and_owners.get(objkind)
+
+    for schema, objects_and_attributes in objects_and_owners.items():
+        # Skip objects in personal schemas; their ownership is already managed by ownerships.py
+        if schema in personal_schemas:
+            continue
+
+        all_owners = set()
+        for objattr in objects_and_attributes.values():
+            if not objattr['is_dependent']:
+                all_owners.add(objattr['owner'])
+
+        # If all objects have the same owner, we just need to do 'schema.*' and we're done
+        if len(all_owners) == 1:
+            owner = list(all_owners)[0]
+
+            if 'owns' not in spec[owner]:
+                spec[owner]['owns'] = {objkind: []}
+            elif objkind not in spec[owner]['owns']:
+                spec[owner]['owns'][objkind] = []
+
+            spec[owner]['owns'][objkind].append('{}.*'.format(schema))
+
+            # Since all objects in this schema are owned by one role, we can skip the below
+            continue
+
+        for objname, objattr in objects_and_attributes.items():
+            # Skip dependent objects; their ownership is managed by the object they depend on
+            if objattr['is_dependent']:
+                continue
+
+            owner = objattr['owner']
+            if 'owns' not in spec[owner]:
+                spec[owner]['owns'] = {objkind: []}
+            elif objkind not in spec[owner]['owns']:
+                spec[owner]['owns'][objkind] = []
+
+            spec[owner]['owns'][objkind].append(objname)
+
+    return spec
+
+
+def add_ownerships(spec, dbcontext):
+    for objkind in PRIVILEGE_MAP.keys():
+        if objkind == 'schemas':
+            spec = add_schema_ownerships(spec, dbcontext)
+        else:
+            spec = add_nonschema_ownerships(spec, dbcontext, objkind)
     return spec
 
 

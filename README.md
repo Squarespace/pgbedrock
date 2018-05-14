@@ -1,7 +1,7 @@
 # pgbedrock
 
 ## What Is pgbedrock?
-pgbedrock is an application for managing the roles, memberships, schema ownership, and most
+pgbedrock is an application for managing the roles, memberships, ownerships, and most
 importantly the permissions for tables, sequences, and schemas in a Postgres database. It takes
 the parameters to connect to a Postgres database (i.e. host, port, etc.) and a YAML file (a 'spec')
 representing the desired database configuration and will make sure that the configuration of that
@@ -20,6 +20,9 @@ jdoe:
     owns:
         schemas:
             - finance_reports
+        tables:
+            - finance_reports.Q2_revenue
+            - finance_reports.Q2_margin
     privileges:
         schemas:
             read:
@@ -48,6 +51,7 @@ When pgbedrock is run, it would make sure that:
 * jdoe is a member of the analyst role
 * jdoe is a member of no other roles
 * jdoe owns the finance_reports schema
+* jdoe owns the finance_reports.Q2_revenue and finance_reports.Q2_margin tables
 * jdoe has read-level schema access (in Postgres terms: USAGE) for the finance and marketing schemas
 * jdoe has write-level schema access (CREATE) for the reports schema
 * jdoe has read-level access (SELECT) to all tables in the finance schema and to the
@@ -179,26 +183,25 @@ Further details on the meanings of parameters can be found by running `pgbedrock
 ## Notable Functionality / Caveats
 * **Postgres cluster must be on Postgres 9.0 or greater.** pgbedrock makes use of the default
 privilege functionality which was introduced in Postgres 9.0. As a result, pgbedrock will only work
-with clusters that are using Postgres 9.0 or greater. Supporting older versions of postgres would
-not be difficult and may be added in the future.
+with clusters that are using Postgres 9.0 or greater. Supporting older versions of Postgres may be
+added in the future.
 
 * **pgbedrock will not delete or alter any objects.** pgbedrock is explicitly written to not do
 anything destructive toward the objects in the database. A revoked permission can simply be
 re-granted, but a table/schema/sequence that has been deleted is gone for good (unless you have
-backups). As a result, pgbedrock will not delete any objects, including roles or schemas. pgbedrock
-will configure roles and schemas, but if they need to be deleted you will have to do that manually.
-If a role or schema is not listed in the spec.yml file then pgbedrock will refuse to run, alerting
-the user of the discrepancy and asking them to manually take action (i.e. delete the role / schema
-or add it to the spec).
+backups). As a result, pgbedrock will not delete any objects, including roles, schemas, tables, and
+sequences. pgbedrock will configure these objects, but if they need to be deleted you will have to
+do that manually. If one of these objects is not listed in the spec.yml file then pgbedrock will
+refuse to run, alerting the user of the discrepancy and asking them to manually take action (i.e.
+delete the role / schema / table / sequence or add it to the spec).
 
-* **Management of object ownership is currently supported only for schemas.** Support for managing
-ownership of tables, sequences, etc. is planned but not currently supported. At present, table
-ownership will be changed only for personal_schemas as described below in 'personal_schemas are
-supported'.
+* **Management of object ownership currently supports only schemas, tables, and sequences.** Support
+for managing ownership of other objects (for example: functions, foreign data wrappers, etc.) is not
+avaiable but may be added in the future.
 
 * **Privilege management is currently supported only for tables, schemas, and sequences.** Managing
 access and ownership to other objects such as functions, foreign data wrappers, foreign servers,
-etc. would not be too difficult to implement and that functionality may be added in the future.
+etc. may be added in the future.
 
 * **Roles and memberships are cluster-wide in Postgres**. This means that if you have multiple
 databases within one Postgres instance, all of those databases share the same roles and role
@@ -272,7 +275,7 @@ bullet in the "Notable Functionality / Caveats" section above for more details).
 
 
 ### Definition of Items within A Spec
-The spec.yml file holds all information about roles, role memberships, schema ownership, and
+The spec.yml file holds all information about roles, role memberships, object ownerships, and
 privileges for a given database. A spec file is a YAML document comprised of a number of role
 definitions. For an example of what a role definition may look like, see the "What Is pgbedrock?"
 section above.
@@ -346,11 +349,20 @@ in the schema. As a result, putting foo.bar\* (to get tables foo.barn or foo.bar
 only foo.\* will work.
 
 **owns**: dict (default: empty)
-The objects that this role owns. At present only schema ownership is managed, which is supported by
-providing the 'schemas' keyword followed by a list of schemas owned by this role (see the "What Is
-pgbedrock?" section for an example). If a schema is intended to be a personal schema (i.e. named
-the same as its owner and with all objects in the schema owned by that schema owner) then use
-`has_personal_schema` instead.
+The objects that this role owns. At present pgbedrock manages schema, table, and sequence ownership.
+Each of these objects is provided as a keyword followed by a list of the objects of that kind that
+is owned by this role. For example:
+```
+analyst:
+    owns:
+        schemas:
+            - finance
+        sequences:
+            - finance.*
+        tables:
+            - finance.*
+            - marketing.ad_spend
+```
 
 
 ### Password Management

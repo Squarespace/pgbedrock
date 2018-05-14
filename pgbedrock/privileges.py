@@ -76,28 +76,6 @@ def analyze_privileges(spec, cursor, verbose):
     return all_sql_to_run
 
 
-def ensure_quoted_identifier(objname):
-    """
-    Ensure that all parts of an identifier after the first dot are surrounded by double quotes.
-    This is necessary because Postgres will not accept identifiers with more than one dot in them
-    unless they are constructed like this.
-
-    How do identifiers like this come to be in the first place? A common scenario is someone
-    accidentally creating an object like 'myschema.mytable' _within_ a schema, i.e. the
-    schema-qualified object is myschema.myschema.mytable. Postgres won't accept a name like
-    that, but it will accept myschema."myschema.mytable".
-    """
-    # This function is irrelevant if the object isn't schema-qualified
-    if '.' not in objname:
-        return objname
-
-    schema, nonschema = objname.split('.', 1)
-    if nonschema.startswith('"') and nonschema.endswith('"'):
-        return objname
-
-    return '{}."{}"'.format(schema, nonschema)
-
-
 def determine_role_members(spec):
     """ Create a dict mapping from each role to all direct and indirect members of that role """
     return {role: get_members(role, spec) for role in spec.keys()}
@@ -316,7 +294,7 @@ class PrivilegeAnalyzer(object):
                 schemas.extend(list(self.personal_schemas))
             elif not item.endswith('.*'):
                 # This is a single non-default privilege ask
-                quoted_item = ensure_quoted_identifier(item)
+                quoted_item = common.ensure_quoted_identifier(item)
                 owner = self.get_object_owner(quoted_item)
                 if owner != self.rolename:
                     desired_nondefault_objs.add(quoted_item)

@@ -5,7 +5,7 @@ import textwrap
 import psycopg2
 import pytest
 
-from conftest import run_setup_sql
+from conftest import quoted_object, run_setup_sql
 from pgbedrock import attributes as attr
 from pgbedrock.context import DatabaseContext
 from pgbedrock import core_generate
@@ -91,7 +91,7 @@ def test_add_memberships(mockdbcontext):
     assert actual == expected
 
 
-def test_add_ownerships(mockdbcontext):
+def test_add_schema_ownerships(mockdbcontext):
     mockdbcontext.get_all_schemas_and_owners = lambda: {
         # Non-personal schemas
         'schema1': 'owner1',
@@ -101,15 +101,17 @@ def test_add_ownerships(mockdbcontext):
         # Personal schema
         'owner1': 'owner1',
 
-        # Would be personal schema but owner2 doesn't have 'can_login' within spec
+        # Would not show up in get_all_personal_schemas as can_login is False
         'owner2': 'owner2',
     }
+    mockdbcontext.get_all_personal_schemas = lambda: set(['owner1'])
+
     spec = {
         'owner1': {'can_login': True},
         'owner2': {},
     }
 
-    actual = core_generate.add_ownerships(spec, mockdbcontext)
+    actual = core_generate.add_schema_ownerships(spec, mockdbcontext)
 
     # There's no guarantee in what order the list of schemas will be returned,
     # so we have to convert the entries to a set to check equivalence
@@ -118,6 +120,144 @@ def test_add_ownerships(mockdbcontext):
     assert set(actual['owner1']['owns']['schemas']) == set(['schema1', 'schema2'])
     assert 'has_personal_schema' not in actual['owner2']
     assert set(actual['owner2']['owns']['schemas']) == set(['owner2', 'schema3'])
+
+
+def test_add_nonschema_ownerships(mockdbcontext):
+    mockdbcontext.get_all_object_attributes = lambda: {
+        'tables': {
+            'schema1': {
+                quoted_object('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
+                # This entry should be skipped because it is dependent
+                quoted_object('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
+                quoted_object('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
+            },
+            'schema2': {
+                # These all have the same owner, so it will become schema2.*
+                quoted_object('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
+                quoted_object('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
+                quoted_object('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
+            },
+            'owner3': {
+                # This entry should be skipped because it is in a personal schema
+                quoted_object('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
+            },
+        },
+        'sequences': {},
+    }
+    mockdbcontext.get_all_personal_schemas = lambda: set(['owner3', 'owner5'])
+
+    spec = {
+        'owner1': {
+            'owns': {
+                'schemas': ['schema1']
+            }
+        },
+        'owner2': {},
+        'owner3': {},
+        'owner4': {},
+    }
+
+    actual = core_generate.add_nonschema_ownerships(spec, mockdbcontext, 'tables')
+    assert actual['owner1']['owns']['schemas'] == ['schema1']
+    assert set(actual['owner1']['owns']['tables']) == set([
+        quoted_object('schema1', 'mytable1'),
+        'schema2.*',
+    ])
+    assert actual['owner2']['owns']['tables'] == [quoted_object('schema1', 'mytable3')]
+    assert actual['owner3'] == {}
+    assert actual['owner4'] == {}
+
+
+@pytest.mark.parametrize('objkind', [('tables'), ('sequences')])
+def test_add_nonschema_ownerships_empty_objkinds(mockdbcontext, objkind):
+    mockdbcontext.get_all_object_attributes = lambda: {
+        'tables': {
+            'schema1': {},
+        },
+        'sequences': {},
+    }
+    mockdbcontext.get_all_personal_schemas = lambda: set(['owner4', 'owner5'])
+
+    spec = {
+        'owner1': {
+            'owns': {
+                'schemas': ['schema1']
+            }
+        },
+        'owner2': {},
+        'owner3': {},
+    }
+
+    actual = core_generate.add_nonschema_ownerships(spec, mockdbcontext, objkind)
+    # Make sure nothing changed
+    assert actual == spec
+
+
+def test_add_ownerships(mockdbcontext):
+    mockdbcontext.get_all_object_attributes = lambda: {
+        'tables': {
+            'schema1': {
+                quoted_object('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
+                # This entry should be skipped because it is dependent
+                quoted_object('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
+                quoted_object('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
+            },
+            'schema2': {
+                # These all have the same owner, so it will become schema2.*
+                quoted_object('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
+                quoted_object('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
+                quoted_object('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
+            },
+            'owner3': {
+                # This entry should be skipped because it is in a personal schema
+                quoted_object('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
+            },
+        },
+        'sequences': {
+            'schema1': {
+                quoted_object('schema1', 'myseq1'): {'owner': 'owner2', 'is_dependent': False},
+                quoted_object('schema1', 'myseq2'): {'owner': 'owner3', 'is_dependent': True},
+            },
+            'schema2': {
+                quoted_object('schema2', 'myseq3'): {'owner': 'owner1', 'is_dependent': False},
+                quoted_object('schema2', 'myseq4'): {'owner': 'owner2', 'is_dependent': False},
+            },
+        },
+    }
+    mockdbcontext.get_all_schemas_and_owners = lambda: {
+        # Non-personal schemas
+        'schema1': 'owner1',
+        'schema2': 'owner1',
+
+        # Personal schema
+        'owner3': 'owner3',
+    }
+    mockdbcontext.get_all_personal_schemas = lambda: set(['owner3'])
+
+    spec = {
+        'owner1': {},
+        'owner2': {},
+        'owner3': {},
+    }
+
+    actual = core_generate.add_ownerships(spec, mockdbcontext)
+    # Schema ownership assertions
+    assert set(actual['owner1']['owns']['schemas']) == set(['schema1', 'schema2'])
+    assert actual['owner3'] == {'has_personal_schema': True}
+
+    # Table ownership assertions
+    assert set(actual['owner1']['owns']['tables']) == set([
+        quoted_object('schema1', 'mytable1'),
+        'schema2.*',
+    ])
+    assert actual['owner2']['owns']['tables'] == [quoted_object('schema1', 'mytable3')]
+
+    # Sequence ownership assertions
+    assert actual['owner1']['owns']['sequences'] == [quoted_object('schema2', 'myseq3')]
+    assert set(actual['owner2']['owns']['sequences']) == set([
+        'schema1.*',
+        quoted_object('schema2', 'myseq4')
+    ])
 
 
 @run_setup_sql([

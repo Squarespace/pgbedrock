@@ -28,6 +28,28 @@ def check_name(name):
         return name
 
 
+def ensure_quoted_identifier(objname):
+    """
+    Ensure that all parts of an identifier after the first dot are surrounded by double quotes.
+    This is necessary because Postgres will not accept identifiers with more than one dot in them
+    unless they are constructed like this.
+
+    How do identifiers like this come to be in the first place? A common scenario is someone
+    accidentally creating an object like 'myschema.mytable' _within_ a schema, i.e. the
+    schema-qualified object is myschema.myschema.mytable. Postgres won't accept a name like
+    that, but it will accept myschema."myschema.mytable".
+    """
+    # This function is irrelevant if the object isn't schema-qualified
+    if '.' not in objname:
+        return objname
+
+    schema, nonschema = objname.split('.', 1)
+    if nonschema.startswith('"') and nonschema.endswith('"'):
+        return objname
+
+    return '{}."{}"'.format(schema, nonschema)
+
+
 def fail(msg):
     click.secho(msg, fg='red')
     sys.exit(1)
