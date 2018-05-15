@@ -23,21 +23,12 @@ VALID_FOREVER_VALUES = (
     dt.datetime.max.replace(tzinfo=psycopg2.tz.FixedOffsetTimezone(offset=0, name=None)))
 
 
-def test_add_attributes(mockdbcontext):
-    mockdbcontext.get_all_role_attributes = lambda: {
-        'foo': {
-            'rolcanlogin': True,
-            'rolconnlimit': 2,
-            'rolinherit': False,
-            'rolsuper': False,
-        },
-        'bar': {
-            'rolcanlogin': False,
-            'rolpassword': 'supersecret',
-            'rolsuper': True,
-            'rolvaliduntil': dt.datetime(2018, 6, 5),
-        },
-    }
+@run_setup_sql([
+    'CREATE ROLE foo WITH LOGIN NOINHERIT CONNECTION LIMIT 2',
+    "CREATE ROLE bar WITH SUPERUSER PASSWORD 'supersecret' VALID UNTIL '2018-06-05'",
+])
+def test_add_attributes(cursor):
+    dbcontext = DatabaseContext(cursor, verbose=True)
     expected = {
         'foo': {
             'can_login': True,
@@ -55,7 +46,7 @@ def test_add_attributes(mockdbcontext):
         },
     }
     spec = {'foo': {}, 'bar': {}}
-    actual = core_generate.add_attributes(spec, mockdbcontext)
+    actual = core_generate.add_attributes(spec, dbcontext)
 
     # There's no guarantee in what order the list of attributes will be returned,
     # so we have to convert the entries to a set to check equivalence
