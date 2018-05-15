@@ -382,9 +382,11 @@ def nondefault_attributes_as_list(rolename, nondefaults):
         elif attr == 'rolconnlimit':
             results.append('CONNECTION LIMIT {}'.format(val))
         elif attr == 'rolpassword':
-            # We put a templated environment variable here instead of
-            # rolpassword's val (which is just an md5 hash anyway)
-            results.append('PASSWORD "{{{{ env[\'{}_PASSWORD\'] }}}}"'.format(rolename.upper()))
+            # Use underscores since tools like Bamboo do not like dashes in envvar names
+            envvar_rolename = rolename.replace('-', '_').upper()
+            # We put a templated environment variable here instead of rolpassword's val
+            # (which is just an md5 hash anyway)
+            results.append('PASSWORD "{{{{ env[\'{}_PASSWORD\'] }}}}"'.format(envvar_rolename))
         else:
             keyword = COLUMN_NAME_TO_KEYWORD[attr]
             prefix = '' if val else 'NO'
