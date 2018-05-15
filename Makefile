@@ -72,7 +72,7 @@ remove_network: stop_postgres
 	@echo "Removing the docker network (if it exists)"
 	-docker network rm $(COMPOSED_NETWORK) || true
 
-start_postgres: create_network stop_postgres
+start_postgres: create_network
 	@echo "Starting postgres"
 	@docker run --rm -d --name $(POSTGRES_HOST) \
         -e POSTGRES_USER=$(POSTGRES_USER) \
@@ -86,7 +86,7 @@ stop_postgres:
 	@echo "Stopping postgres (if it is running)"
 	@-docker stop $(POSTGRES_HOST) || true
 
-test: clean build_tester create_network start_postgres wait_for_postgres test27 test36 stop_postgres clean
+test: clean build_tester start_postgres wait_for_postgres test27 test36 remove_network clean
 
 test27:
 	@echo "Running pytest with Python 2.7"
