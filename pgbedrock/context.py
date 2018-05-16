@@ -105,7 +105,23 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
     ;
     """
 
-Q_GET_ALL_ROLE_ATTRIBUTES = "SELECT * FROM pg_authid WHERE rolname != 'pg_signal_backend';"
+Q_GET_ALL_ROLE_ATTRIBUTES = """
+    SELECT
+        rolbypassrls,
+        rolcanlogin,
+        rolconnlimit,
+        rolcreatedb,
+        rolcreaterole,
+        rolinherit,
+        rolname,
+        rolpassword,
+        rolreplication,
+        rolsuper,
+        rolvaliduntil
+    FROM pg_authid
+    WHERE rolname != 'pg_signal_backend'
+    ;
+    """
 
 Q_GET_ALL_MEMBERSHIPS = """
     SELECT
