@@ -1,21 +1,6 @@
-language: python
-python:
-  - "2.7"
-  - "3.6"
 services:
-  - postgresql
-env:
-  - POSTGRES_PORT=5432
-install:
-  - pip install -e . -r requirements-dev.txt
-
-before_script:
-  # add roles pgbedrock needs
-  - psql -c "CREATE DATABASE test_db;" -U postgres
-  - psql -c "CREATE ROLE test_user WITH PASSWORD 'test_password' LOGIN SUPERUSER;" -U postgres
-  # drop travis built-in roles so pgbedrock has a clean slate to test against
-  - psql -c "DROP ROLE rails;" -U postgres
-  - psql -c "DROP ROLE travis;" -U postgres
+  - docker
 
 script:
-  - pytest
+  # sudo is required in order to run `make clean`
+  - sudo make test
