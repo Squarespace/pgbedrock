@@ -66,6 +66,28 @@ def test_add_attributes(mockdbcontext):
     assert set(actual['bar']['attributes']) == set(expected['bar']['attributes'])
 
 
+def test_add_attributes_password_for_rolename_with_dash(mockdbcontext):
+    mockdbcontext.get_all_role_attributes = lambda: {
+        'foo-bar-baz': {
+            'rolpassword': 'supersecret',
+            # These are expected to exist for core_generate.add_attributes
+            'rolcanlogin': False,
+            'rolsuper': False,
+        },
+    }
+    expected = {
+        'foo-bar-baz': {
+            'attributes': [
+                'PASSWORD "{{ env[\'FOO_BAR_BAZ_PASSWORD\'] }}"',
+            ],
+        },
+    }
+    spec = {'foo-bar-baz': {}}
+    actual = core_generate.add_attributes(spec, mockdbcontext)
+
+    assert actual == expected
+
+
 def test_add_memberships(mockdbcontext):
     mockdbcontext.get_all_memberships = lambda: [
         ('foo', 'bar'),
