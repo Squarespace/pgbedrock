@@ -1,6 +1,13 @@
 services:
   - docker
 
+env:
+  - SUPPORTED_PG_VERSIONS=9.3.23
+  - SUPPORTED_PG_VERSIONS=9.4.18
+  - SUPPORTED_PG_VERSIONS=9.5.13
+  - SUPPORTED_PG_VERSIONS=9.6.4
+  - SUPPORTED_PG_VERSIONS=10.4
+
 script:
   # sudo is required in order to run `make clean`
   - sudo make test

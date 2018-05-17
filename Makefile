@@ -1,6 +1,6 @@
 .PHONY: attach build build_tester clean coverage create_network psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version test27 test36 wait_for_postgres
 
-SUPPORTED_PG_VERSIONS= 9.5.13 9.6.4
+SUPPORTED_PG_VERSIONS ?= 9.3.23 9.4.18 9.5.13 9.6.4 10.4
 # The default Postgres that will be used in individual targets
 POSTGRES_VERSION = 9.6.4
 
