@@ -1,4 +1,8 @@
-.PHONY: attach build build_tester clean coverage create_network psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test27 test36 wait_for_postgres
+.PHONY: attach build build_tester clean coverage create_network psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version test27 test36 wait_for_postgres
+
+SUPPORTED_PG_VERSIONS ?= 9.5.13 9.6.4
+# The default Postgres that will be used in individual targets
+POSTGRES_VERSION = 9.6.4
 
 COMPOSED_NETWORK = pgbedrock_network
 POSTGRES_HOST = pgbedrock_postgres
@@ -6,8 +10,8 @@ POSTGRES_DB = test_db
 POSTGRES_USER = test_user
 POSTGRES_PASSWORD = test_password
 
-FULL_NAME := quay.io/squarespace/pgbedrock
-VERSION := `grep "^__version__" pgbedrock/__init__.py | cut -d "'" -f 2`
+FULL_NAME = quay.io/squarespace/pgbedrock
+VERSION = `grep "^__version__" pgbedrock/__init__.py | cut -d "'" -f 2`
 
 
 attach:
@@ -73,20 +77,26 @@ remove_network: stop_postgres
 	-docker network rm $(COMPOSED_NETWORK) || true
 
 start_postgres: create_network
-	@echo "Starting postgres"
+	@echo "Starting postgres $(POSTGRES_VERSION)"
 	@docker run --rm -d --name $(POSTGRES_HOST) \
         -e POSTGRES_USER=$(POSTGRES_USER) \
         -e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
         -e POSTGRES_DB=$(POSTGRES_DB) \
 		-p 54321:5432 \
         --net=$(COMPOSED_NETWORK) \
-        postgres:9.6.4
+        postgres:$(POSTGRES_VERSION)
 
 stop_postgres:
 	@echo "Stopping postgres (if it is running)"
 	@-docker stop $(POSTGRES_HOST) || true
 
-test: clean build_tester start_postgres wait_for_postgres test27 test36 remove_network clean
+test_one_pg_version: start_postgres wait_for_postgres test27 test36 remove_network clean
+
+test: clean build_tester
+	@for pg_version in ${SUPPORTED_PG_VERSIONS}; do \
+        echo "\n\nTesting Postgres $$pg_version"; \
+        $(MAKE) test_one_pg_version POSTGRES_VERSION="$$pg_version"; \
+    done
 
 test27:
 	@echo "Running pytest with Python 2.7"
@@ -115,7 +125,8 @@ wait_for_postgres:
         -e POSTGRES_USER=$(POSTGRES_USER) \
         -e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
         -e POSTGRES_DB=$(POSTGRES_DB) \
+        -e POSTGRES_VERSION=$(POSTGRES_VERSION) \
 		-v $(shell pwd)/tests/wait_for_postgres.sh:/wait_for_postgres.sh \
         --net=$(COMPOSED_NETWORK) \
 		--entrypoint="/wait_for_postgres.sh" \
-        postgres:9.6.4
+        postgres:$(POSTGRES_VERSION)
