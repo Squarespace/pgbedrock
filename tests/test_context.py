@@ -2,6 +2,7 @@ import pytest
 
 from conftest import quoted_object, run_setup_sql
 from pgbedrock import privileges as privs, attributes, ownerships, context
+from pgbedrock import memberships
 
 
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
@@ -356,7 +357,6 @@ def test_is_superuser(all_role_attributes, expected):
 
 
 
-
 @run_setup_sql([
     # Create two roles
     attributes.Q_CREATE_ROLE.format(ROLES[0]),
@@ -389,6 +389,26 @@ def test_get_all_schemas_and_owners(cursor):
     actual_again = dbcontext.get_all_schemas_and_owners()
     assert actual_again == actual
 
+
+
+@run_setup_sql([
+    # Create 3 roles
+    attributes.Q_CREATE_ROLE.format(ROLES[0]),
+    attributes.Q_CREATE_ROLE.format(ROLES[1]),
+    attributes.Q_CREATE_ROLE.format(ROLES[2]),
+
+    # Assign memberships
+    memberships.Q_GRANT_MEMBERSHIP.format(ROLES[0], ROLES[1]),
+    memberships.Q_GRANT_MEMBERSHIP.format(ROLES[1], ROLES[2]),
+])
+def test_get_all_memberships(cursor):
+    dbcontext = context.DatabaseContext(cursor, verbose=True)
+    actual = dbcontext.get_all_memberships()
+
+    assert isinstance(actual, list)
+    assert len(actual) == 2
+    assert ['role1', 'role0'] in actual
+    assert ['role2', 'role1'] in actual
 
 
 

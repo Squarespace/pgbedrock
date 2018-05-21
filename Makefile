@@ -2,7 +2,7 @@
 
 SUPPORTED_PG_VERSIONS ?= 9.5.13 9.6.4
 # The default Postgres that will be used in individual targets
-POSTGRES_VERSION = 9.6.4
+POSTGRES_VERSION ?= 9.6.4
 
 COMPOSED_NETWORK = pgbedrock_network
 POSTGRES_HOST = pgbedrock_postgres
