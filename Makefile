@@ -1,4 +1,4 @@
-.PHONY: attach build build_tester clean coverage create_network psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version test27 test36 wait_for_postgres
+.PHONY: attach build build_tester clean coverage create_network docs psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version test27 test36 view_docs wait_for_postgres
 
 SUPPORTED_PG_VERSIONS ?= 9.5.13 9.6.4
 # The default Postgres that will be used in individual targets
@@ -42,13 +42,16 @@ clean:
 	@find . -name '*.pyc' -delete
 	@find . -name '*.retry' -delete
 
-coverage:
+coverage: start_postgres
 	coverage run --include="pgbedrock/*,tests/*" -m pytest
 	coverage report -m --skip-covered
 
 create_network: remove_network
 	@echo "Creating the docker network"
 	@docker network create $(COMPOSED_NETWORK)
+
+docs:
+	$(MAKE) -C docs html O=-nW
 
 psql:
 	@docker exec -it $(POSTGRES_HOST) psql -d $(POSTGRES_DB) -U $(POSTGRES_USER)
@@ -130,3 +133,6 @@ wait_for_postgres:
         --net=$(COMPOSED_NETWORK) \
 		--entrypoint="/wait_for_postgres.sh" \
         postgres:$(POSTGRES_VERSION)
+
+view_docs: docs
+	open docs/_build/html/index.html
