@@ -13,7 +13,7 @@ match the spec.
 It can be run as a docker container (via `docker run quay.io/squarespace/pgbedrock`) or as a local
 command-line utility (via `pip install pgbedrock` and then `pgbedrock`).
 
-Detailed documentation can be found at http://pgbedrock.readthedocs.io/.
+Detailed documentation can be found at [here](https://pgbedrock.readthedocs.io/en/latest/).
 
 
 ## Example
@@ -123,7 +123,7 @@ but these steps can also be done with the pip-installed version of the tool.
    would introduce, run the above command again using `--live` instead of `--check`. Changes
    will now be made real. To make future changes, modify the spec file and run the above command.
 
-For further information, see the documentation at http://pgbedrock.readthedocs.io/.
+For further information, see the documentation [here](https://pgbedrock.readthedocs.io/en/latest/).
 
 
 ## License
