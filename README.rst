@@ -4,6 +4,9 @@ pgbedrock
 .. image:: https://travis-ci.org/Squarespace/pgbedrock.svg?branch=master
     :target: https://travis-ci.org/Squarespace/pgbedrock
 
+.. image:: https://coveralls.io/repos/github/Squarespace/pgbedrock/badge.svg?branch=master
+    :target: https://coveralls.io/github/Squarespace/pgbedrock?branch=master
+
 pgbedrock is an application for managing the roles, memberships, ownerships, and most importantly
 the permissions for tables, sequences, and schemas in a Postgres database.
 
