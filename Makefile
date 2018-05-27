@@ -42,9 +42,8 @@ clean:
 	@find . -name '*.pyc' -delete
 	@find . -name '*.retry' -delete
 
-coverage: start_postgres
-	coverage run --include="pgbedrock/*,tests/*" -m pytest
-	coverage report -m --skip-covered
+coverage: start_postgres wait_for_postgres
+	pytest --cov pgbedrock/ --cov-report=term-missing:skip-covered
 
 create_network: remove_network
 	@echo "Creating the docker network"
