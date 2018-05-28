@@ -1,16 +1,17 @@
 pgbedrock
 =========
+|travis_ci| |coveralls| |pip_versions| |postgres_versions|
 
-.. image:: https://travis-ci.org/Squarespace/pgbedrock.svg?branch=master
+.. |travis_ci| image:: https://travis-ci.org/Squarespace/pgbedrock.svg?branch=master
     :target: https://travis-ci.org/Squarespace/pgbedrock
 
-.. image:: https://coveralls.io/repos/github/Squarespace/pgbedrock/badge.svg?branch=master
+.. |coveralls| image:: https://coveralls.io/repos/github/Squarespace/pgbedrock/badge.svg?branch=master
     :target: https://coveralls.io/github/Squarespace/pgbedrock?branch=master
 
-.. image:: https://img.shields.io/pypi/pyversions/pgbedrock.svg
+.. |pip_versions| image:: https://img.shields.io/pypi/pyversions/pgbedrock.svg
     :target: https://pypi.python.org/pypi/pgbedrock
 
-.. image:: https://img.shields.io/badge/postgres-9.5,_9.6-blue.svg
+.. |postgres_versions| image:: https://img.shields.io/badge/postgres-9.5,_9.6-blue.svg
 
 
 pgbedrock is an application for managing the roles, memberships, ownerships, and most importantly
