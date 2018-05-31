@@ -1,8 +1,8 @@
 .PHONY: attach build build_tester clean coverage create_network docs psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version test27 test36 view_docs wait_for_postgres
 
-SUPPORTED_PG_VERSIONS ?= 9.5.13 9.6.4
+SUPPORTED_PG_VERSIONS ?= 9.5.13 9.6.4 10.4
 # The default Postgres that will be used in individual targets
-POSTGRES_VERSION ?= 9.6.4
+POSTGRES_VERSION ?= 10.4
 
 COMPOSED_NETWORK = pgbedrock_network
 POSTGRES_HOST = pgbedrock_postgres

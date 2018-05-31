@@ -313,15 +313,22 @@ def test_get_all_personal_schemas(cursor):
     ])
 def test_get_all_role_attributes(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
-    actual = dbcontext.get_all_role_attributes()
+
     expected = set(['test_user', 'postgres', ROLES[0], ROLES[1]])
+    pg_version = dbcontext.get_version_info().postgres_version
+    # Postgres 10 introduces several new roles that we have to account for
+    if pg_version.startswith('10.'):
+        expected.update(set([
+            'pg_read_all_settings', 'pg_stat_scan_tables', 'pg_read_all_stats', 'pg_monitor']
+        ))
+
+    actual = dbcontext.get_all_role_attributes()
     assert set(actual.keys()) == expected
 
     # Make sure that this data is cached for future use
     cursor.close()
     actual_again = dbcontext.get_all_role_attributes()
     assert actual_again == actual
-
 
 
 
@@ -403,12 +410,24 @@ def test_get_all_schemas_and_owners(cursor):
 ])
 def test_get_all_memberships(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
-    actual = dbcontext.get_all_memberships()
 
+    expected = set([('role1', 'role0'), ('role2', 'role1')])
+    pg_version = dbcontext.get_version_info().postgres_version
+    # Postgres 10 introduces several new roles and memberships that we have to account for
+    if pg_version.startswith('10.'):
+        expected.update(set([
+            ('pg_monitor', 'pg_stat_scan_tables'),
+            ('pg_monitor', 'pg_read_all_stats'),
+            ('pg_monitor', 'pg_read_all_settings'),
+        ]))
+
+    actual = dbcontext.get_all_memberships()
     assert isinstance(actual, list)
-    assert len(actual) == 2
-    assert ['role1', 'role0'] in actual
-    assert ['role2', 'role1'] in actual
+    assert len(actual) == len(expected)
+
+    # Convert actual to a set of tuples so comparison is easier
+    actual_converted = set([tuple(i) for i in actual])
+    assert actual_converted == expected
 
 
 
@@ -499,3 +518,18 @@ def test_get_all_raw_object_attributes(cursor):
     cursor.close()
     raw_results_again = dbcontext.get_all_raw_object_attributes()
     assert raw_results_again == raw_results
+
+
+def test_get_version_info(cursor):
+    dbcontext = context.DatabaseContext(cursor, verbose=True)
+    actual = dbcontext.get_version_info()
+
+    assert isinstance(actual, context.VersionInfo)
+    assert not actual.is_redshift
+    assert not actual.redshift_version
+    # We do not check the Postgres version since we test against multiple Postgres versions
+
+    # Make sure that this data is cached for future use
+    cursor.close()
+    actual_again = dbcontext.get_version_info()
+    assert actual_again == actual

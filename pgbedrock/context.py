@@ -206,6 +206,15 @@ Q_GET_ALL_PERSONAL_SCHEMAS = """
     ;
     """
 
+Q_GET_VERSIONS = """
+    SELECT
+        substring(version from 'PostgreSQL ([0-9.]*) ') AS postgres_version,
+        substring(version from 'Redshift ([0-9.]*)') AS redshift_version,
+        version LIKE '%Redshift%' AS is_redshift
+    FROM version()
+    ;
+"""
+
 # Write access causes read access to be granted as well. As a result, we
 # don't add things like SELECT for tables into the write privileges
 PRIVILEGE_MAP = {
@@ -226,6 +235,7 @@ PRIVILEGE_MAP = {
 ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
 ObjectAttributes = namedtuple('ObjectAttributes',
                               ['kind', 'schema', 'name', 'owner', 'is_dependent'])
+VersionInfo = namedtuple('VersionInfo', ['postgres_version', 'redshift_version', 'is_redshift'])
 
 
 class DatabaseContext(object):
@@ -242,6 +252,7 @@ class DatabaseContext(object):
         'get_all_nonschema_objects_and_owners',
         'get_all_personal_schemas',
         'get_all_schemas_and_owners',
+        'get_version_info',
     }
 
     def __init__(self, cursor, verbose):
@@ -513,3 +524,10 @@ class DatabaseContext(object):
                 return False
 
         return True
+
+    def get_version_info(self):
+        """ Return information for this Postgres instance """
+        common.run_query(self.cursor, self.verbose, Q_GET_VERSIONS)
+        results = self.cursor.fetchone()
+        info = VersionInfo(*results)
+        return info
