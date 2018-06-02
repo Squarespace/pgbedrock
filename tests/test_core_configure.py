@@ -138,10 +138,11 @@ def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_confi
     attr.Q_ALTER_PASSWORD.format(NEW_USER, 'some_password'),
 ])
 @pytest.mark.usefixtures('drop_users_and_objects')
-def test_no_password_attribute_makes_password_none(capsys, cursor, spec_with_new_user, db_config):
+def test_no_password_attribute_makes_password_none(cursor, spec_with_new_user, db_config):
 
-    # We have to commit the changes from @run_setup_sql so they will be seen by
-    # the transaction generated within pgbedrock configure
+    # We have to commit the changes from @run_setup_sql so they will be seen by the transaction
+    # generated within pgbedrock configure as that will use a new cursor with a new transaction.
+    # The NEW_USER role will get dropped by the drop_users_and_objects fixture though
     cursor.connection.commit()
 
     # Assert that we start with the role whose password we are trying to modify
@@ -165,7 +166,6 @@ def test_no_password_attribute_makes_password_none(capsys, cursor, spec_with_new
              )
     )
     core_configure.configure(**params)
-    out, err = capsys.readouterr()
 
     # Assert that the password is NULL now
     cursor.execute("SELECT rolpassword IS NULL FROM pg_authid WHERE rolname = '{}'".format(NEW_USER))
