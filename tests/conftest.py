@@ -133,7 +133,7 @@ def base_spec(cursor):
 
 
 @pytest.fixture
-def tiny_spec(tmpdir, base_spec):
+def spec_with_new_user(tmpdir, base_spec):
     # NOTE: if the test_password isn't provided here we end up changing our
     # test_user's password for real in the test_configure_live_mode_works
     spec = copy.copy(base_spec)

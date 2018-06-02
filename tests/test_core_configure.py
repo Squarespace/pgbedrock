@@ -45,7 +45,7 @@ def test_configure_no_changes_needed(tmpdir, capsys, db_config, base_spec):
 
 @pytest.mark.usefixtures('drop_users_and_objects')
 @pytest.mark.parametrize('live_mode, expected', [(True, 1), (False, 0)])
-def test_configure_live_mode_works(capsys, cursor, tiny_spec, db_config, live_mode, expected):
+def test_configure_live_mode_works(capsys, cursor, spec_with_new_user, db_config, live_mode, expected):
     """
     We add a new user (NEW_USER) through pgbedrock and make sure that 1) this change isn't
     committed if we pass --check and 2) this change _is_ committed if we pass --live
@@ -56,7 +56,7 @@ def test_configure_live_mode_works(capsys, cursor, tiny_spec, db_config, live_mo
 
     params = copy.deepcopy(db_config)
     params.update(
-        dict(spec_path=tiny_spec,
+        dict(spec_path=spec_with_new_user,
              prompt=False,
              attributes=True,
              memberships=True,
@@ -138,7 +138,7 @@ def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_confi
     attr.Q_ALTER_PASSWORD.format(NEW_USER, 'some_password'),
 ])
 @pytest.mark.usefixtures('drop_users_and_objects')
-def test_no_password_attribute_makes_password_none(capsys, cursor, tiny_spec, db_config):
+def test_no_password_attribute_makes_password_none(capsys, cursor, spec_with_new_user, db_config):
 
     # We have to commit the changes from @run_setup_sql so they will be seen by
     # the transaction generated within pgbedrock configure
@@ -154,7 +154,7 @@ def test_no_password_attribute_makes_password_none(capsys, cursor, tiny_spec, db
 
     params = copy.deepcopy(db_config)
     params.update(
-        dict(spec_path=tiny_spec,
+        dict(spec_path=spec_with_new_user,
              prompt=False,
              attributes=True,
              memberships=True,
