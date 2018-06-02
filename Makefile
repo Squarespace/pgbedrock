@@ -97,7 +97,7 @@ test_one_pg_version: start_postgres wait_for_postgres test27 test36 remove_netwo
 
 test: clean build_tester
 	@for pg_version in ${SUPPORTED_PG_VERSIONS}; do \
-        echo "\n\nTesting Postgres $$pg_version"; \
+        echo "\n\n\n\n\n\n\nTesting Postgres $$pg_version"; \
         $(MAKE) test_one_pg_version POSTGRES_VERSION="$$pg_version"; \
     done
 
