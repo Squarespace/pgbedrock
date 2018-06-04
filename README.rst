@@ -8,7 +8,7 @@ pgbedrock
 .. |coveralls| image:: https://coveralls.io/repos/github/Squarespace/pgbedrock/badge.svg?branch=master
     :target: https://coveralls.io/github/Squarespace/pgbedrock?branch=master
 
-.. |postgres_versions| image:: https://img.shields.io/badge/postgres-9.5,_9.6-blue.svg
+.. |postgres_versions| image:: https://img.shields.io/badge/postgres-9.5,_9.6,_10-blue.svg
 
 .. |pip_versions| image:: https://img.shields.io/pypi/pyversions/pgbedrock.svg
     :target: https://pypi.python.org/pypi/pgbedrock
