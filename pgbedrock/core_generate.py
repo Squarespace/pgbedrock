@@ -104,7 +104,7 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     all_objects_and_owners = dbcontext.get_all_object_attributes()
-    objects_and_owners = all_objects_and_owners.get(objkind)
+    objects_and_owners = all_objects_and_owners.get(objkind, {})
 
     for schema, objects_and_attributes in objects_and_owners.items():
         # Skip objects in personal schemas; their ownership is already managed by ownerships.py

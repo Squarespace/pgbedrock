@@ -1,10 +1,11 @@
 import copy
+from textwrap import dedent
 
 import pytest
 
-from pgbedrock import core_configure
-from pgbedrock import ownerships as own
 from conftest import Q_GET_ROLE_ATTRIBUTE, NEW_USER, run_setup_sql
+from pgbedrock import core_configure, context
+from pgbedrock import ownerships as own
 from pgbedrock import attributes as attr
 from test_ownerships import Q_SCHEMA_EXISTS
 from test_memberships import Q_HAS_ROLE
@@ -21,31 +22,9 @@ def test_has_changes(statements, expected):
 
 
 @pytest.mark.usefixtures('drop_users_and_objects')
-def test_configure_no_changes_needed(tmpdir, capsys, db_config):
-    """
-    We add a new user (NEW_USER) through pgbedrock and make sure that 1) this change isn't
-    committed if we pass --check and 2) this change _is_ committed if we pass --live
-    """
-
+def test_configure_no_changes_needed(tmpdir, capsys, db_config, base_spec):
     spec_path = tmpdir.join('spec.yml')
-    spec_path.write("""
-    postgres:
-        is_superuser: yes
-        owns:
-            schemas:
-                - information_schema
-                - pg_catalog
-                - public
-            tables:
-                - information_schema.*
-                - pg_catalog.*
-
-    test_user:
-        can_login: yes
-        is_superuser: yes
-        attributes:
-            - PASSWORD "test_password"
-    """.format(new_user=NEW_USER))
+    spec_path.write(base_spec)
 
     params = copy.deepcopy(db_config)
     params.update(
@@ -66,7 +45,7 @@ def test_configure_no_changes_needed(tmpdir, capsys, db_config):
 
 @pytest.mark.usefixtures('drop_users_and_objects')
 @pytest.mark.parametrize('live_mode, expected', [(True, 1), (False, 0)])
-def test_configure_live_mode_works(capsys, cursor, tiny_spec, db_config, live_mode, expected):
+def test_configure_live_mode_works(capsys, cursor, spec_with_new_user, db_config, live_mode, expected):
     """
     We add a new user (NEW_USER) through pgbedrock and make sure that 1) this change isn't
     committed if we pass --check and 2) this change _is_ committed if we pass --live
@@ -77,7 +56,7 @@ def test_configure_live_mode_works(capsys, cursor, tiny_spec, db_config, live_mo
 
     params = copy.deepcopy(db_config)
     params.update(
-        dict(spec_path=tiny_spec,
+        dict(spec_path=spec_with_new_user,
              prompt=False,
              attributes=True,
              memberships=True,
@@ -107,7 +86,7 @@ def test_configure_live_mode_works(capsys, cursor, tiny_spec, db_config, live_mo
 
 
 @pytest.mark.usefixtures('drop_users_and_objects')
-def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_config):
+def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_config, base_spec):
     """
     We add a new user (NEW_USER) through pgbedrock and make sure that 1) this change isn't
     committed if we pass --check and 2) this change _is_ committed if we pass --live
@@ -117,30 +96,15 @@ def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_confi
     assert cursor.rowcount == 0
 
     new_password = 'supersecret'
+    spec = copy.copy(base_spec)
+    spec += dedent("""
+        {new_user}:
+            attributes:
+                - PASSWORD "{new_password}"
+        """.format(new_user=NEW_USER, new_password=new_password))
+
     spec_path = tmpdir.join('spec.yml')
-    spec_path.write("""
-    postgres:
-        is_superuser: yes
-        owns:
-            schemas:
-                - information_schema
-                - pg_catalog
-                - public
-            tables:
-                - information_schema.*
-                - pg_catalog.*
-
-    test_user:
-        can_login: yes
-        is_superuser: yes
-        attributes:
-            - PASSWORD "test_password"
-
-    {new_user}:
-        attributes:
-            - PASSWORD "{new_password}"
-    """.format(new_user=NEW_USER, new_password=new_password))
-
+    spec_path.write(spec)
     params = copy.deepcopy(db_config)
     params.update(
         dict(spec_path=spec_path.strpath,
@@ -174,10 +138,11 @@ def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_confi
     attr.Q_ALTER_PASSWORD.format(NEW_USER, 'some_password'),
 ])
 @pytest.mark.usefixtures('drop_users_and_objects')
-def test_no_password_attribute_makes_password_none(capsys, cursor, tiny_spec, db_config):
+def test_no_password_attribute_makes_password_none(cursor, spec_with_new_user, db_config):
 
-    # We have to commit the changes from @run_setup_sql so they will be seen by
-    # the transaction generated within pgbedrock configure
+    # We have to commit the changes from @run_setup_sql so they will be seen by the transaction
+    # generated within pgbedrock configure as that will use a new cursor with a new transaction.
+    # The NEW_USER role will get dropped by the drop_users_and_objects fixture though
     cursor.connection.commit()
 
     # Assert that we start with the role whose password we are trying to modify
@@ -190,7 +155,7 @@ def test_no_password_attribute_makes_password_none(capsys, cursor, tiny_spec, db
 
     params = copy.deepcopy(db_config)
     params.update(
-        dict(spec_path=tiny_spec,
+        dict(spec_path=spec_with_new_user,
              prompt=False,
              attributes=True,
              memberships=True,
@@ -201,42 +166,27 @@ def test_no_password_attribute_makes_password_none(capsys, cursor, tiny_spec, db
              )
     )
     core_configure.configure(**params)
-    out, err = capsys.readouterr()
 
     # Assert that the password is NULL now
     cursor.execute("SELECT rolpassword IS NULL FROM pg_authid WHERE rolname = '{}'".format(NEW_USER))
     assert cursor.fetchone()[0] is True
 
 
-def test_configure_schema_role_has_dash(tmpdir, capsys, db_config):
+def test_configure_schema_role_has_dash(tmpdir, capsys, db_config, cursor, base_spec):
     """
     We add a new user ('role-with-dash') through pgbedrock and make sure that that user can create
     a personal schema
     """
     role = 'role-with-dash'
 
+    spec = copy.copy(base_spec)
+    spec += dedent("""
+        {}:
+            has_personal_schema: yes
+        """.format(role))
+
     spec_path = tmpdir.join('spec.yml')
-    spec_path.write("""
-    postgres:
-        is_superuser: yes
-        owns:
-            schemas:
-                - information_schema
-                - pg_catalog
-                - public
-            tables:
-                - information_schema.*
-                - pg_catalog.*
-
-    test_user:
-        can_login: yes
-        is_superuser: yes
-        attributes:
-            - PASSWORD "test_password"
-
-    {}:
-        has_personal_schema: yes
-    """.format(role))
+    spec_path.write(spec)
 
     params = copy.deepcopy(db_config)
     params.update(

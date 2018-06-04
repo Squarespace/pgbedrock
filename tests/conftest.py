@@ -1,6 +1,8 @@
+import copy
 import logging
 import os
 import sys
+from textwrap import dedent
 
 import psycopg2
 from psycopg2 import extras  # access via psycopg2.extras doesn't work so this import is needed
@@ -62,8 +64,11 @@ def drop_users_and_objects(cursor):
     cursor.execute("""
         SELECT rolname
         FROM pg_authid
-        WHERE rolname NOT IN ('test_user', 'postgres', 'pg_signal_backend')
-        ;
+        WHERE rolname NOT IN (
+            'test_user', 'postgres', 'pg_signal_backend',
+            -- Roles introduced in Postgres 10:
+            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables'
+        );
         """)
     users = [u[0] for u in cursor.fetchall()]
     for user in users:
@@ -72,37 +77,79 @@ def drop_users_and_objects(cursor):
 
 
 @pytest.fixture
-def tiny_spec(tmpdir):
-    # NOTE: if the test_password isn't provided here we end up changing our test_user's password
-    # for real in our test_main_run_mode_works test below
+def base_spec(cursor):
+    """ A spec with the existing state of the test database before anything has been done """
+    spec = dedent("""
+        postgres:
+            attributes:
+                - BYPASSRLS
+                - CREATEDB
+                - CREATEROLE
+                - REPLICATION
+            can_login: true
+            is_superuser: true
+            owns:
+                schemas:
+                    - information_schema
+                    - pg_catalog
+                    - public
+                tables:
+                    - information_schema.*
+                    - pg_catalog.*
+            privileges:
+                schemas:
+                    write:
+                        - information_schema
+                        - pg_catalog
+                        - public
+
+        test_user:
+            attributes:
+                - PASSWORD "test_password"
+            can_login: yes
+            is_superuser: yes
+        """)
+
+    # Postgres 10 introduces several new roles that we have to account for
+    cursor.execute("SELECT substring(version from 'PostgreSQL ([0-9.]*) ') FROM version()")
+    pg_version = cursor.fetchone()[0]
+    if pg_version.startswith('10.'):
+        spec += dedent("""
+
+            pg_read_all_settings:
+
+            pg_stat_scan_tables:
+
+            pg_read_all_stats:
+
+            pg_monitor:
+                member_of:
+                    - pg_read_all_settings
+                    - pg_stat_scan_tables
+                    - pg_read_all_stats
+            """)
+
+    return spec
+
+
+@pytest.fixture
+def spec_with_new_user(tmpdir, base_spec):
+    # NOTE: if the test_password isn't provided here we end up changing our
+    # test_user's password for real in the test_configure_live_mode_works
+    spec = copy.copy(base_spec)
+    spec += dedent("""
+        {new_user}:
+            has_personal_schema: yes
+            member_of:
+                - postgres
+            privileges:
+                tables:
+                    read:
+                        - pg_catalog.pg_class
+         """.format(new_user=NEW_USER))
+
     spec_path = tmpdir.join('spec.yml')
-    spec_path.write("""
-    postgres:
-        is_superuser: yes
-        owns:
-            schemas:
-                - information_schema
-                - pg_catalog
-                - public
-            tables:
-                - information_schema.*
-                - pg_catalog.*
-
-    test_user:
-        can_login: yes
-        is_superuser: yes
-        attributes:
-            - PASSWORD "test_password"
-
-    {new_user}:
-        has_personal_schema: yes
-        member_of:
-            - postgres
-        privileges:
-            tables:
-                read:
-                    - pg_catalog.pg_class
-    """.format(new_user=NEW_USER))
+    spec_path.write(spec)
     return spec_path.strpath
 
 
