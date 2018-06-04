@@ -1,22 +1,33 @@
+# We only use Python for coveralls; both Python 2.7 and 3.6 are
+# tested but that is done within docker containers
 language: python
+python: 3.6
 
 services:
-  - docker
+    - docker
 
 jobs:
-  include:
-    - stage: Testing
-      env: SUPPORTED_PG_VERSIONS=9.5.13
-      script: sudo make test
+    include:
+        - stage: Testing
+          env: SUPPORTED_PG_VERSIONS=9.5.13
+          # sudo is required in order to run `make clean`
+          script: sudo make test
 
-    - stage: # Intentionally left blank to parallelize
-      env: SUPPORTED_PG_VERSIONS=9.6.4
-      script: sudo make test
+        - stage: # Intentionally left blank to parallelize
+          env: SUPPORTED_PG_VERSIONS=9.6.4
+          script: sudo make test
 
-    - stage: # Intentionally left blank to parallelize
-      env: SUPPORTED_PG_VERSIONS=10.4
-      script: sudo make test
+        - stage: # Intentionally left blank to parallelize
+          env: SUPPORTED_PG_VERSIONS=10.4
+          script: sudo make test
 
-    - stage: # Intentionally left blank to parallelize
-      install: pip install -e . -r requirements-docs.txt
-      script: make docs
+        - stage: # Intentionally left blank to parallelize
+          install: pip install -e . -r requirements-docs.txt
+          script: make docs
+
+after_success:
+    # Paths in .coverage file were based on the path in the docker container;
+    # Put the code in the same place so coveralls can determine coverage
+    - cp -r pgbedrock/ /opt/
+    - pip install coveralls
+    - coveralls
