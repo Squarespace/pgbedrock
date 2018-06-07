@@ -385,16 +385,16 @@ class DatabaseContext(object):
             access_key = 'read' if is_read_priv else 'write'
 
             entry = (row.objname, row.privilege)
-            role_defaults = current_nondefaults[row.grantee]
+            role_nondefaults = current_nondefaults[row.grantee]
 
             # Create this role's dict substructure for the first entry we come across
-            if row.objkind not in role_defaults:
-                role_defaults[row.objkind] = {
+            if row.objkind not in role_nondefaults:
+                role_nondefaults[row.objkind] = {
                     'read': set(),
                     'write': set(),
                 }
 
-            role_defaults[row.objkind][access_key].add(entry)
+            role_nondefaults[row.objkind][access_key].add(entry)
 
         return current_nondefaults
 
