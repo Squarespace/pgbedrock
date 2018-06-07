@@ -16,6 +16,61 @@ SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
 DUMMY = 'foo'
 
 
+def test_dbobject_nonschema():
+    myobj = context.DBObject(schema='myschema', object_name='mytable')
+    assert myobj.schema == 'myschema'
+    assert myobj.object_name == 'mytable'
+    assert myobj.qualified_name == '"myschema"."mytable"'
+
+
+def test_dbobject_schema():
+    myobj = context.DBObject(schema='myschema')
+    assert myobj.schema == 'myschema'
+    assert myobj.object_name is None
+    assert myobj.qualified_name == '"myschema"'
+
+
+def test_dbobject_unquoted_item():
+    assert context.DBObject._unquoted_item('foo') == 'foo'
+    assert context.DBObject._unquoted_item('"foo"') == 'foo'
+
+
+def test_dbobject_equivalence():
+    myobj1 = context.DBObject(schema='myschema', object_name='mytable')
+    myobj2 = context.DBObject(schema='myschema', object_name='mytable')
+    assert myobj1 == myobj2
+
+    myobj1 = context.DBObject(schema='myschema')
+    myobj2 = context.DBObject(schema='myschema')
+    assert myobj1 == myobj2
+
+
+@pytest.mark.parametrize('full_name', [('foo'), ('"foo"')])
+def test_dbobject_from_str_only_schema(full_name):
+    myobj = context.DBObject.from_str(full_name)
+    assert isinstance(myobj, context.DBObject)
+    assert myobj.schema == 'foo'
+    assert myobj.object_name is None
+    assert myobj.qualified_name == '"foo"'
+
+
+@pytest.mark.parametrize('full_name, schema_name, object_name, qualified_name', [
+    ('foo.bar', 'foo', 'bar', '"foo"."bar"'),
+    ('foo."bar"', 'foo', 'bar', '"foo"."bar"'),
+    ('"foo".bar', 'foo', 'bar', '"foo"."bar"'),
+    ('"foo"."bar"', 'foo', 'bar', '"foo"."bar"'),
+    ('"foo".bar.baz', 'foo', 'bar.baz', '"foo"."bar.baz"'),
+    ('"foo"."bar.baz"', 'foo', 'bar.baz', '"foo"."bar.baz"'),
+    ('foo.*', 'foo', '*', '"foo"."*"'),
+])
+def test_objectname_from_str_schema_and_object(full_name, schema_name, object_name, qualified_name):
+    myobj = context.DBObject.from_str(full_name)
+    assert isinstance(myobj, context.DBObject)
+    assert myobj.schema == schema_name
+    assert myobj.object_name == object_name
+    assert myobj.qualified_name == qualified_name
+
+
 
 
 @run_setup_sql(
