@@ -511,8 +511,7 @@ class DatabaseContext(object):
         for i in self.cursor.fetchall():
             row = NamedRow(*i)
             dbobject = DBObject(schema=row.schema, object_name=row.objname)
-            entry = ObjectAttributes(row.kind, row.schema, dbobject.qualified_name,
-                                     row.owner, row.is_dependent)
+            entry = ObjectAttributes(row.kind, row.schema, dbobject, row.owner, row.is_dependent)
             results.append(entry)
         return results
 
@@ -546,8 +545,8 @@ class DatabaseContext(object):
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.name] = {'owner': row.owner,
-                                                    'is_dependent': row.is_dependent}
+            objkind_owners[row.schema][row.name.qualified_name] = {'owner': row.owner,
+                                                                   'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -589,7 +588,7 @@ class DatabaseContext(object):
         schema_objects = defaultdict(list)
         for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
-                objinfo = ObjectInfo(row.kind, row.name, row.owner, row.is_dependent)
+                objinfo = ObjectInfo(row.kind, row.name.qualified_name, row.owner, row.is_dependent)
                 schema_objects[row.schema].append(objinfo)
 
         return schema_objects
