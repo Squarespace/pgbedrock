@@ -235,7 +235,7 @@ PRIVILEGE_MAP = {
 
 ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
 ObjectAttributes = namedtuple('ObjectAttributes',
-                              ['kind', 'schema', 'name', 'owner', 'is_dependent'])
+                              ['kind', 'schema', 'dbobject', 'owner', 'is_dependent'])
 VersionInfo = namedtuple('VersionInfo', ['postgres_version', 'redshift_version', 'is_redshift'])
 
 
@@ -545,8 +545,9 @@ class DatabaseContext(object):
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.name.qualified_name] = {'owner': row.owner,
-                                                                   'is_dependent': row.is_dependent}
+            # TODO: Remove this qualified_name
+            objkind_owners[row.schema][row.dbobject.qualified_name] = {'owner': row.owner,
+                                                                       'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -588,7 +589,7 @@ class DatabaseContext(object):
         schema_objects = defaultdict(list)
         for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
-                objinfo = ObjectInfo(row.kind, row.name.qualified_name, row.owner, row.is_dependent)
+                objinfo = ObjectInfo(row.kind, row.dbobject.qualified_name, row.owner, row.is_dependent)
                 schema_objects[row.schema].append(objinfo)
 
         return schema_objects

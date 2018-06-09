@@ -242,7 +242,7 @@ def ensure_no_missing_objects(spec, dbcontext, objkind):
     db_objects = set()
     for obj in dbcontext.get_all_raw_object_attributes():
         if obj.kind == objkind and not obj.is_dependent:
-            db_objects.add(obj.name.qualified_name)
+            db_objects.add(obj.dbobject.qualified_name)
 
     db_objects_by_schema = dbcontext.get_all_object_attributes().get(objkind, dict())
     spec_objects = set()
