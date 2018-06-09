@@ -57,9 +57,8 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
                ('S', 'sequences')
     ), tables_and_sequences AS (
         SELECT
-            -- We have to wrap the table name in double quotes in case there's a dot, e.g.
-            -- jdoe.jdoe.bar (note: this is often a mistake on the table creator's part)
-            nsp.nspname || '."' || c.relname || '"' AS objname,
+            nsp.nspname AS schema,
+            c.relname AS objname,
             map.objkind,
             (aclexplode(c.relacl)).grantee AS grantee_oid,
             t_owner.rolname AS owner,
@@ -77,7 +76,8 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
             AND c.relacl IS NOT NULL
     ), schemas AS (
         SELECT
-             nsp.nspname AS objname,
+             nsp.nspname AS schema,
+             NULL::TEXT AS objname,
              'schemas'::TEXT AS objkind,
              (aclexplode(nsp.nspacl)).grantee AS grantee_oid,
              t_owner.rolname AS owner,
@@ -95,6 +95,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
     SELECT
         t_grantee.rolname AS grantee,
         combined.objkind,
+        combined.schema,
         combined.objname,
         combined.privilege_type
     FROM
@@ -444,17 +445,18 @@ class DatabaseContext(object):
 
             This will not include privileges granted by this role to itself
         """
-        NonDefaultRow = namedtuple('NonDefaultRow',
-                                   ['grantee', 'objkind', 'objname', 'privilege'])
+        NamedRow = namedtuple('NamedRow',
+                              ['grantee', 'objkind', 'schema', 'objname', 'privilege'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_CURRENT_NONDEFAULTS)
         current_nondefaults = defaultdict(dict)
 
         for i in self.cursor.fetchall():
-            row = NonDefaultRow(*i)
+            row = NamedRow(*i)
             is_read_priv = row.privilege in PRIVILEGE_MAP[row.objkind]['read']
             access_key = 'read' if is_read_priv else 'write'
 
-            entry = (row.objname, row.privilege)
+            dbobject = DBObject(schema=row.schema, object_name=row.objname)
+            entry = (dbobject.qualified_name, row.privilege)
             role_nondefaults = current_nondefaults[row.grantee]
 
             # Create this role's dict substructure for the first entry we come across
