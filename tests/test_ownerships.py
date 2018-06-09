@@ -1,7 +1,7 @@
 from conftest import quoted_object, run_setup_sql
 from pgbedrock import ownerships as own
 from pgbedrock import attributes, privileges
-from pgbedrock.context import ObjectInfo
+from pgbedrock.context import ObjectInfo, DBObject
 
 Q_CREATE_SEQUENCE = 'SET ROLE {}; CREATE SEQUENCE {}.{}; RESET ROLE;'
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
@@ -183,10 +183,10 @@ def test_schemaanalyzer_existing_schema_same_owner(mockdbcontext):
 def test_schemaanalyzer_existing_personal_schema_change_object_owners(mockdbcontext):
     mockdbcontext.get_schema_owner = lambda x: ROLES[0]
     mockdbcontext.get_schema_objects = lambda x: [
-        ObjectInfo('tables', quoted_object(ROLES[0], TABLES[0]), ROLES[0], False),
-        ObjectInfo('sequences', quoted_object(ROLES[0], SEQUENCES[0]), ROLES[0], False),
-        ObjectInfo('tables', quoted_object(ROLES[0], TABLES[1]), ROLES[1], False),
-        ObjectInfo('sequences', quoted_object(ROLES[0], SEQUENCES[1]), ROLES[1], False),
+        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[0]), ROLES[0], False),
+        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[0]), ROLES[0], False),
+        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[1]), ROLES[1], False),
+        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[1]), ROLES[1], False),
     ]
     schema = ROLES[0]
 
@@ -233,15 +233,15 @@ def test_schemaanalyzer_get_improperly_owned_objects(mockdbcontext):
     mockdbcontext.get_schema_owner = lambda x: ROLES[0]
     mockdbcontext.get_schema_objects = lambda x: [
         # Properly owned
-        ObjectInfo('tables', quoted_object(ROLES[0], TABLES[0]), ROLES[0], False),
-        ObjectInfo('sequences', quoted_object(ROLES[0], SEQUENCES[0]), ROLES[0], False),
+        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[0]), ROLES[0], False),
+        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[0]), ROLES[0], False),
 
         # Improperly owned
-        ObjectInfo('tables', quoted_object(ROLES[0], TABLES[1]), ROLES[1], False),
-        ObjectInfo('sequences', quoted_object(ROLES[0], SEQUENCES[1]), ROLES[1], False),
+        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[1]), ROLES[1], False),
+        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[1]), ROLES[1], False),
 
         # Improperly owned but dependent (i.e. should be skipped)
-        ObjectInfo('sequences', quoted_object(ROLES[0], SEQUENCES[2]), ROLES[1], True),
+        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[2]), ROLES[1], True),
     ]
     schema = ROLES[0]
 

@@ -325,7 +325,7 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
     schema_objects = set()
     for entry in objects_and_owners:
         if entry.kind == objkind and entry.owner != role:
-            schema_objects.add(entry.name)
+            schema_objects.add(entry.dbobject.qualified_name)
 
     has_default_write = dbcontext.has_default_privilege(role, schema, objkind, 'write')
     all_writes_raw = dbcontext.get_role_objects_with_access(role, schema, objkind, 'write')

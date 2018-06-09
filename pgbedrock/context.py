@@ -233,7 +233,7 @@ PRIVILEGE_MAP = {
          },
 }
 
-ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
+ObjectInfo = namedtuple('ObjectInfo', ['kind', 'dbobject', 'owner', 'is_dependent'])
 ObjectAttributes = namedtuple('ObjectAttributes',
                               ['kind', 'schema', 'dbobject', 'owner', 'is_dependent'])
 VersionInfo = namedtuple('VersionInfo', ['postgres_version', 'redshift_version', 'is_redshift'])
@@ -581,7 +581,7 @@ class DatabaseContext(object):
     def get_all_nonschema_objects_and_owners(self):
         """
         For all objkinds other than schemas return a dict of the form
-            {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
+            {schema_name: [(objkind, dbobject, objowner, is_dependent), ...]}
 
         This is primarily a helper for DatabaseContext.get_schema_objects so we have O(1)
         schema object lookups instead of needing to iterate through all objects every time
@@ -589,7 +589,7 @@ class DatabaseContext(object):
         schema_objects = defaultdict(list)
         for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
-                objinfo = ObjectInfo(row.kind, row.dbobject.qualified_name, row.owner, row.is_dependent)
+                objinfo = ObjectInfo(row.kind, row.dbobject, row.owner, row.is_dependent)
                 schema_objects[row.schema].append(objinfo)
 
         return schema_objects

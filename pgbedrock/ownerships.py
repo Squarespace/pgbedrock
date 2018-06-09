@@ -133,7 +133,7 @@ class SchemaAnalyzer(object):
         objects = []
         for item in self.schema_objects:
             if item.owner != self.rolename and not item.is_dependent:
-                objects.append((item.kind, item.name, item.owner))
+                objects.append((item.kind, item.dbobject.qualified_name, item.owner))
         return objects
 
     def alter_object_owner(self, objkind, objname, prev_owner):

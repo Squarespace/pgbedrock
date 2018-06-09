@@ -525,13 +525,13 @@ def test_get_all_nonschema_objects_and_owners(cursor):
     expected = {
         SCHEMAS[0]:
         [
-            context.ObjectInfo('tables', quoted_object(SCHEMAS[0], TABLES[0]), ROLES[0], False),
-            context.ObjectInfo('sequences', quoted_object(SCHEMAS[0], SEQUENCES[1]), ROLES[0], False),
+            context.ObjectInfo('tables', context.DBObject(schema=SCHEMAS[0], object_name=TABLES[0]), ROLES[0], False),
+            context.ObjectInfo('sequences', context.DBObject(schema=SCHEMAS[0], object_name=SEQUENCES[1]), ROLES[0], False),
         ],
         SCHEMAS[1]:
         [
-            context.ObjectInfo('tables', quoted_object(SCHEMAS[1], TABLES[0]), ROLES[1], False),
-            context.ObjectInfo('sequences', quoted_object(SCHEMAS[1], SEQUENCES[2]), ROLES[1], False),
+            context.ObjectInfo('tables', context.DBObject(schema=SCHEMAS[1], object_name=TABLES[0]), ROLES[1], False),
+            context.ObjectInfo('sequences', context.DBObject(schema=SCHEMAS[1], object_name=SEQUENCES[2]), ROLES[1], False),
         ],
     }
     actual = dbcontext.get_all_nonschema_objects_and_owners()
@@ -549,10 +549,7 @@ def test_get_all_nonschema_objects_and_owners(cursor):
 
 def test_get_schema_objects():
     schema = 'foo'
-    expected = [
-        context.ObjectInfo('tables', quoted_object(SCHEMAS[0], TABLES[0]), ROLES[0], False),
-        context.ObjectInfo('sequences', quoted_object(SCHEMAS[0], SEQUENCES[1]), ROLES[0], False),
-    ]
+    expected = 'bar'
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=False)
     dbcontext._cache['get_all_nonschema_objects_and_owners'] = lambda: {schema: expected}
     actual = dbcontext.get_schema_objects(schema)
@@ -562,10 +559,7 @@ def test_get_schema_objects():
 def test_get_schema_objects_no_entry():
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=False)
     dbcontext._cache['get_all_nonschema_objects_and_owners'] = lambda: {
-        'foo': [
-            context.ObjectInfo('tables', quoted_object(SCHEMAS[0], TABLES[0]), ROLES[0], False),
-            context.ObjectInfo('sequences', quoted_object(SCHEMAS[0], SEQUENCES[1]), ROLES[0], False),
-        ],
+        'foo': 'bar',
     }
     actual = dbcontext.get_schema_objects('key_not_in_response')
     assert actual == []
