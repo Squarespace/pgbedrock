@@ -430,11 +430,11 @@ class DatabaseContext(object):
             {roleA: {
                 objkindA: {
                     'read': set([
-                        (objname, privilege),
+                        (dbobject, privilege),
                         ...
                         ]),
                     'write': set([
-                        (objname, privilege),
+                        (dbobject, privilege),
                         ...
                         ]),
                     },
@@ -456,7 +456,7 @@ class DatabaseContext(object):
             access_key = 'read' if is_read_priv else 'write'
 
             dbobject = DBObject(schema=row.schema, object_name=row.objname)
-            entry = (dbobject.qualified_name, row.privilege)
+            entry = (dbobject, row.privilege)
             role_nondefaults = current_nondefaults[row.grantee]
 
             # Create this role's dict substructure for the first entry we come across
@@ -477,7 +477,8 @@ class DatabaseContext(object):
         Returns a set of tuples of the form set([(objname, privilege), ... ]) """
         all_current_nondefaults = self.get_all_current_nondefaults()
         try:
-            return all_current_nondefaults[rolename][object_kind][access]
+            items = all_current_nondefaults[rolename][object_kind][access]
+            return set([(dbobject.qualified_name, priv) for dbobject, priv in items])
         except KeyError:
             return set()
 

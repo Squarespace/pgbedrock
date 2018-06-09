@@ -191,8 +191,8 @@ def test_get_all_current_nondefaults(cursor):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (quoted_object(SCHEMAS[0], TABLES[1]), 'SELECT'),
-                    (quoted_object(SCHEMAS[1], TABLES[3]), 'SELECT'),
+                    (context.DBObject(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
+                    (context.DBObject(schema=SCHEMAS[1], object_name=TABLES[3]), 'SELECT'),
                 ]),
                 'write': set(),
             }
@@ -201,8 +201,8 @@ def test_get_all_current_nondefaults(cursor):
             'schemas': {
                 'read': set(),
                 'write': set([
-                    (SCHEMAS[0], 'CREATE'),
-                    (SCHEMAS[1], 'CREATE'),
+                    (context.DBObject(schema=SCHEMAS[0]), 'CREATE'),
+                    (context.DBObject(schema=SCHEMAS[1]), 'CREATE'),
                 ]),
             }
         },
@@ -210,8 +210,8 @@ def test_get_all_current_nondefaults(cursor):
             'schemas': {
                 'read': set(),
                 'write': set([
-                    (SCHEMAS[0], 'CREATE'),
-                    (SCHEMAS[1], 'CREATE'),
+                    (context.DBObject(schema=SCHEMAS[0]), 'CREATE'),
+                    (context.DBObject(schema=SCHEMAS[1]), 'CREATE'),
                 ]),
             }
         }
@@ -228,7 +228,11 @@ def test_get_all_current_nondefaults(cursor):
 
 
 @pytest.mark.parametrize('rolename, object_kind, access, expected', [
-    ('role1', 'object_kind1', 'access1', set([1, 2, 3])),
+    ('role1', 'object_kind1', 'access1', set([
+        ('foo."bar"', 'SELECT'),
+        ('foo."baz"', 'SELECT'),
+        ('foo."qux"', 'INSERT')
+    ])),
     ('role1', 'object_kind1', 'missing_access', set()),
     ('role1', 'missing_object_kind1', 'access1', set()),
     ('missing_role1', 'object_kind1', 'access', set()),
@@ -238,11 +242,16 @@ def test_get_role_current_nondefaults(rolename, object_kind, access, expected):
     dbcontext._cache['get_all_current_nondefaults'] = lambda: {
         'role1': {
             'object_kind1': {
-                'access1': set([1, 2, 3])
+                'access1': set([
+                    (context.DBObject(schema='foo', object_name='bar'), 'SELECT'),
+                    (context.DBObject(schema='foo', object_name='baz'), 'SELECT'),
+                    (context.DBObject(schema='foo', object_name='qux'), 'INSERT'),
+                ])
             }
         }
     }
-    assert dbcontext.get_role_current_nondefaults(rolename, object_kind, access) == expected
+    actual = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
+    assert actual == expected
 
 
 
@@ -260,8 +269,8 @@ def test_get_role_objects_with_access(access, expected):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (quoted_object(SCHEMAS[0], TABLES[0]), 'SELECT'),
-                    (quoted_object(SCHEMAS[0], TABLES[1]), 'SELECT'),
+                    (context.DBObject(schema=SCHEMAS[0], object_name=TABLES[0]), 'SELECT'),
+                    (context.DBObject(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
                 ])
             }
         }
