@@ -12,6 +12,7 @@ import yaml
 
 from conftest import quoted_object, run_setup_sql
 from pgbedrock import privileges as privs, attributes, ownerships
+from pgbedrock.context import DBObject
 
 
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
@@ -640,8 +641,8 @@ def test_analyze_nondefaults(mockdbcontext):
         - schema1.table3 (owned by role3) - GRANTED           --> REVOKE
     """
     mockdbcontext.get_role_current_nondefaults = lambda x, y, z: set([
-        (quoted_object(SCHEMAS[0], TABLES[1]), 'SELECT'),
-        (quoted_object(SCHEMAS[1], TABLES[3]), 'SELECT'),
+        (DBObject(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
+        (DBObject(schema=SCHEMAS[1], object_name=TABLES[3]), 'SELECT'),
     ])
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {

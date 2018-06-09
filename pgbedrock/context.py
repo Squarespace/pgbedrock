@@ -421,8 +421,8 @@ class DatabaseContext(object):
 
         results = set()
         for objname, _ in objects_with_access:
-            if objname.split('.', 1)[0] == schema:
-                results.add(objname)
+            if objname.schema == schema:
+                results.add(objname.qualified_name)
         return results
 
     def get_all_current_nondefaults(self):
@@ -474,11 +474,13 @@ class DatabaseContext(object):
         """ Return the current non-default privileges for a specific
         rolename x object_kind x access type, e.g. for role jdoe x tables x read.
 
-        Returns a set of tuples of the form set([(objname, privilege), ... ]) """
+        Returns:
+            set: A set of tuples consisting of a database object and a privilege
+                with types (context.DBObject, str)
+        """
         all_current_nondefaults = self.get_all_current_nondefaults()
         try:
-            items = all_current_nondefaults[rolename][object_kind][access]
-            return set([(dbobject.qualified_name, priv) for dbobject, priv in items])
+            return all_current_nondefaults[rolename][object_kind][access]
         except KeyError:
             return set()
 

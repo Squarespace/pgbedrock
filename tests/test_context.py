@@ -229,9 +229,9 @@ def test_get_all_current_nondefaults(cursor):
 
 @pytest.mark.parametrize('rolename, object_kind, access, expected', [
     ('role1', 'object_kind1', 'access1', set([
-        ('foo."bar"', 'SELECT'),
-        ('foo."baz"', 'SELECT'),
-        ('foo."qux"', 'INSERT')
+        (context.DBObject(schema='foo', object_name='bar'), 'SELECT'),
+        (context.DBObject(schema='foo', object_name='baz'), 'SELECT'),
+        (context.DBObject(schema='foo', object_name='qux'), 'INSERT'),
     ])),
     ('role1', 'object_kind1', 'missing_access', set()),
     ('role1', 'missing_object_kind1', 'access1', set()),

@@ -187,7 +187,14 @@ class PrivilegeAnalyzer(object):
         self.default_acl_possible = self.object_kind in OBJECTS_WITH_DEFAULTS
 
         self.current_defaults = dbcontext.get_role_current_defaults(rolename, object_kind, access)
-        self.current_nondefaults = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
+
+        # TODO: Use the DBObject instance instead of it's qualified_name
+        current_nondefault_objects = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
+        if current_nondefault_objects:
+            self.current_nondefaults = set([(dbo.qualified_name, priv) for dbo, priv in current_nondefault_objects])
+        else:
+            self.current_nondefaults = set()
+
         self.all_object_attrs = dbcontext.get_all_object_attributes()
 
     def analyze(self):

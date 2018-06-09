@@ -239,8 +239,9 @@ def determine_schema_privileges(role, dbcontext):
     write_schemas_and_owners = dbcontext.get_role_current_nondefaults(role, 'schemas', 'write')
     read_schemas_and_owners = dbcontext.get_role_current_nondefaults(role,  'schemas', 'read')
 
-    write_schemas = {s for s, _ in write_schemas_and_owners}
-    read_schemas = {s for s, _ in read_schemas_and_owners}
+    # TODO: Use the DBObject instance instead of it's qualified_name
+    write_schemas = {s.qualified_name for s, _ in write_schemas_and_owners}
+    read_schemas = {s.qualified_name for s, _ in read_schemas_and_owners}
 
     # Get all schemas owned by this role
     all_owned_schemas = dbcontext.get_all_schemas_and_owners()
