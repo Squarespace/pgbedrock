@@ -20,14 +20,14 @@ def test_dbobject_nonschema():
     myobj = context.DBObject(schema='myschema', object_name='mytable')
     assert myobj.schema == 'myschema'
     assert myobj.object_name == 'mytable'
-    assert myobj.qualified_name == '"myschema"."mytable"'
+    assert myobj.qualified_name == 'myschema."mytable"'
 
 
 def test_dbobject_schema():
     myobj = context.DBObject(schema='myschema')
     assert myobj.schema == 'myschema'
     assert myobj.object_name is None
-    assert myobj.qualified_name == '"myschema"'
+    assert myobj.qualified_name == 'myschema'
 
 
 def test_dbobject_unquoted_item():
@@ -51,17 +51,17 @@ def test_dbobject_from_str_only_schema(full_name):
     assert isinstance(myobj, context.DBObject)
     assert myobj.schema == 'foo'
     assert myobj.object_name is None
-    assert myobj.qualified_name == '"foo"'
+    assert myobj.qualified_name == 'foo'
 
 
 @pytest.mark.parametrize('full_name, schema_name, object_name, qualified_name', [
-    ('foo.bar', 'foo', 'bar', '"foo"."bar"'),
-    ('foo."bar"', 'foo', 'bar', '"foo"."bar"'),
-    ('"foo".bar', 'foo', 'bar', '"foo"."bar"'),
-    ('"foo"."bar"', 'foo', 'bar', '"foo"."bar"'),
-    ('"foo".bar.baz', 'foo', 'bar.baz', '"foo"."bar.baz"'),
-    ('"foo"."bar.baz"', 'foo', 'bar.baz', '"foo"."bar.baz"'),
-    ('foo.*', 'foo', '*', '"foo"."*"'),
+    ('foo.bar', 'foo', 'bar', 'foo."bar"'),
+    ('foo."bar"', 'foo', 'bar', 'foo."bar"'),
+    ('"foo".bar', 'foo', 'bar', 'foo."bar"'),
+    ('"foo"."bar"', 'foo', 'bar', 'foo."bar"'),
+    ('"foo".bar.baz', 'foo', 'bar.baz', 'foo."bar.baz"'),
+    ('"foo"."bar.baz"', 'foo', 'bar.baz', 'foo."bar.baz"'),
+    ('foo.*', 'foo', '*', 'foo."*"'),
 ])
 def test_objectname_from_str_schema_and_object(full_name, schema_name, object_name, qualified_name):
     myobj = context.DBObject.from_str(full_name)

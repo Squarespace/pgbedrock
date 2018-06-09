@@ -255,9 +255,10 @@ class DBObject(object):
         self._object_name = self._unquoted_item(object_name)
 
         if self._object_name:
-            self._qualified_name = '"{}"."{}"'.format(self.schema, self.object_name)
+            #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
+            self._qualified_name = '{}."{}"'.format(self.schema, self.object_name)
         else:
-            self._qualified_name = '"{}"'.format(self.schema)
+            self._qualified_name = '{}'.format(self.schema)
 
     def __eq__(self, other):
         return (self.schema == other.schema) and (self.object_name == other.object_name)
