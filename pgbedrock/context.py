@@ -422,11 +422,7 @@ class DatabaseContext(object):
             set: A set of context.DBObject instances
         """
         objects_with_access = self.get_role_current_nondefaults(rolename, object_kind, access)
-
-        results = set()
-        for objname, _ in objects_with_access:
-            if objname.schema == schema:
-                results.add(objname)
+        results = set([dbo for dbo, _ in objects_with_access if dbo.schema == schema])
         return results
 
     def get_all_current_nondefaults(self):
