@@ -148,7 +148,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         SELECT
             map.kind,
             nsp.nspname AS schema,
-            nsp.nspname || '."' || c.relname || '"' AS name,
+            c.relname AS objname,
             c.relowner AS owner_id,
             -- Auto-dependency means that a sequence is linked to a table. Ownership of
             -- that sequence automatically derives from the table's ownership
@@ -167,13 +167,13 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         GROUP BY
             map.kind,
             schema,
-            name,
+            objname,
             owner_id
     ), schemas AS (
         SELECT
             'schemas'::TEXT AS kind,
             nsp.nspname AS schema,
-            nsp.nspname AS name,
+            NULL::TEXT AS objname,
             nsp.nspowner AS owner_id,
             FALSE AS is_dependent
         FROM pg_namespace nsp
@@ -187,7 +187,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
     SELECT
         co.kind,
         co.schema,
-        co.name,
+        co.objname,
         t_owner.rolname AS owner,
         co.is_dependent
     FROM combined AS co
@@ -503,7 +503,14 @@ class DatabaseContext(object):
         important. Thus, this helper method is here to ensure that we only run this query once.
         """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
-        results = [ObjectAttributes(*row) for row in self.cursor.fetchall()]
+        results = []
+        NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'objname', 'owner', 'is_dependent'])
+        for i in self.cursor.fetchall():
+            row = NamedRow(*i)
+            dbobject = DBObject(schema=row.schema, object_name=row.objname)
+            entry = ObjectAttributes(row.kind, row.schema, dbobject.qualified_name,
+                                     row.owner, row.is_dependent)
+            results.append(entry)
         return results
 
     def get_all_object_attributes(self):
