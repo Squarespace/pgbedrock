@@ -455,10 +455,7 @@ class DatabaseContext(object):
             is_read_priv = row.privilege in PRIVILEGE_MAP[row.objkind]['read']
             access_key = 'read' if is_read_priv else 'write'
 
-            dbobject = DBObject(schema=row.schema, object_name=row.objname)
-            entry = (dbobject, row.privilege)
             role_nondefaults = current_nondefaults[row.grantee]
-
             # Create this role's dict substructure for the first entry we come across
             if row.objkind not in role_nondefaults:
                 role_nondefaults[row.objkind] = {
@@ -466,6 +463,8 @@ class DatabaseContext(object):
                     'write': set(),
                 }
 
+            dbobject = DBObject(schema=row.schema, object_name=row.objname)
+            entry = (dbobject, row.privilege)
             role_nondefaults[row.objkind][access_key].add(entry)
 
         return current_nondefaults
