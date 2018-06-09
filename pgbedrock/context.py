@@ -416,13 +416,17 @@ class DatabaseContext(object):
 
     def get_role_objects_with_access(self, rolename, schema, object_kind, access):
         """ Return the set of objects in this schema which the given rolename has the
-        specified access for """
+        specified access for
+
+        Returns:
+            set: A set of context.DBObject instances
+        """
         objects_with_access = self.get_role_current_nondefaults(rolename, object_kind, access)
 
         results = set()
         for objname, _ in objects_with_access:
             if objname.schema == schema:
-                results.add(objname.qualified_name)
+                results.add(objname)
         return results
 
     def get_all_current_nondefaults(self):

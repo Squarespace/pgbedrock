@@ -259,8 +259,8 @@ def test_get_role_current_nondefaults(rolename, object_kind, access, expected):
 @pytest.mark.parametrize('access, expected', [
     ('write', set()),
     ('read', set([
-        quoted_object(SCHEMAS[0], TABLES[0]),
-        quoted_object(SCHEMAS[0], TABLES[1])
+        context.DBObject(schema=SCHEMAS[0], object_name=TABLES[0]),
+        context.DBObject(schema=SCHEMAS[0], object_name=TABLES[1])
     ])),
 ])
 def test_get_role_objects_with_access(access, expected):

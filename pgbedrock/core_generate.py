@@ -328,7 +328,9 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
             schema_objects.add(entry.name)
 
     has_default_write = dbcontext.has_default_privilege(role, schema, objkind, 'write')
-    all_writes = dbcontext.get_role_objects_with_access(role, schema, objkind, 'write')
+    all_writes_raw = dbcontext.get_role_objects_with_access(role, schema, objkind, 'write')
+    # TODO: Remove the need for using DBObject.qualified_name
+    all_writes = set([i.qualified_name for i in all_writes_raw])
 
     if has_default_write or (all_writes == schema_objects and all_writes != set()):
         # In the second condition, every object has a write privilege, so we assume that means
@@ -338,7 +340,9 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
     # If we haven't returned yet then no write default privilege exists; we will have to
     # grant each write individually, meaning we also need to look at read privileges
     has_default_read = dbcontext.has_default_privilege(role, schema, objkind, 'read')
-    all_reads = dbcontext.get_role_objects_with_access(role, schema, objkind, 'read')
+    all_reads_raw = dbcontext.get_role_objects_with_access(role, schema, objkind, 'read')
+    # TODO: Remove the need for using DBObject.qualified_name
+    all_reads = set([i.qualified_name for i in all_reads_raw])
 
     if has_default_read or (all_reads == schema_objects and all_reads != set()):
         # In the second condition, every object has a read privilege, so we assume that means
