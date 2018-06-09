@@ -371,13 +371,13 @@ class DatabaseContext(object):
 
             This will not include privileges granted by this role to itself
         """
-        DefaultRow = namedtuple('DefaultRow',
-                                ['grantee', 'objkind', 'grantor', 'schema', 'privilege'])
+        NamedRow = namedtuple('NamedRow',
+                              ['grantee', 'objkind', 'grantor', 'schema', 'privilege'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_CURRENT_DEFAULTS)
 
         current_defaults = defaultdict(dict)
         for i in self.cursor.fetchall():
-            row = DefaultRow(*i)
+            row = NamedRow(*i)
             is_read_priv = row.privilege in PRIVILEGE_MAP[row.objkind]['read']
             access_key = 'read' if is_read_priv else 'write'
 
