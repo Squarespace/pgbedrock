@@ -150,17 +150,20 @@ def test_analyze_ownerships_schemas_and_nonschemas(cursor):
 def test_schemaanalyzer_init(mockdbcontext):
     mockdbcontext.get_schema_owner = lambda x: 'foo'
     mockdbcontext.get_schema_objects = lambda x: 'bar'
-    schemaconf = own.SchemaAnalyzer(rolename=ROLES[0], schema=SCHEMAS[0], dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(rolename=ROLES[0], dbobject=DBObject(SCHEMAS[0]),
+                                    dbcontext=mockdbcontext)
 
     assert schemaconf.rolename == ROLES[0]
-    assert schemaconf.schema == SCHEMAS[0]
+    assert isinstance(schemaconf.dbobject, DBObject)
+    assert schemaconf.dbobject.schema == SCHEMAS[0]
     assert schemaconf.current_owner == 'foo'
     assert schemaconf.exists is True
     assert schemaconf.schema_objects == 'bar'
 
 
 def test_schemaanalyzer_analyzer_creates_schema(mockdbcontext):
-    schemaconf = own.SchemaAnalyzer(ROLES[0], schema=SCHEMAS[0], dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(ROLES[0], dbobject=DBObject(SCHEMAS[0]),
+                                    dbcontext=mockdbcontext)
     actual = schemaconf.analyze()
     expected = [own.Q_CREATE_SCHEMA.format(SCHEMAS[0], ROLES[0])]
     assert actual == expected
@@ -168,30 +171,31 @@ def test_schemaanalyzer_analyzer_creates_schema(mockdbcontext):
 
 def test_schemaanalyzer_existing_schema_owner_change(mockdbcontext):
     mockdbcontext.get_schema_owner = lambda x: ROLES[1]
-    schemaconf = own.SchemaAnalyzer(ROLES[0], schema=SCHEMAS[0], dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(ROLES[0], dbobject=DBObject(SCHEMAS[0]),
+                                    dbcontext=mockdbcontext)
     changes = schemaconf.analyze()
     assert changes == [own.Q_SET_SCHEMA_OWNER.format(SCHEMAS[0], ROLES[0], ROLES[1])]
 
 
 def test_schemaanalyzer_existing_schema_same_owner(mockdbcontext):
     mockdbcontext.get_schema_owner = lambda x: ROLES[0]
-    schemaconf = own.SchemaAnalyzer(ROLES[0], schema=SCHEMAS[0], dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(ROLES[0], dbobject=DBObject(SCHEMAS[0]),
+                                    dbcontext=mockdbcontext)
     changes = schemaconf.analyze()
     assert changes == []
 
 
 def test_schemaanalyzer_existing_personal_schema_change_object_owners(mockdbcontext):
+    personal_schema = ROLES[0]
     mockdbcontext.get_schema_owner = lambda x: ROLES[0]
     mockdbcontext.get_schema_objects = lambda x: [
-        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[0]), ROLES[0], False),
-        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[0]), ROLES[0], False),
-        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[1]), ROLES[1], False),
-        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[1]), ROLES[1], False),
+        ObjectInfo('tables', DBObject(schema=personal_schema, object_name=TABLES[0]), ROLES[0], False),
+        ObjectInfo('sequences', DBObject(schema=personal_schema, object_name=SEQUENCES[0]), ROLES[0], False),
+        ObjectInfo('tables', DBObject(schema=personal_schema, object_name=TABLES[1]), ROLES[1], False),
+        ObjectInfo('sequences', DBObject(schema=personal_schema, object_name=SEQUENCES[1]), ROLES[1], False),
     ]
-    schema = ROLES[0]
-
-    schemaconf = own.SchemaAnalyzer(ROLES[0], schema=schema, dbcontext=mockdbcontext,
-                                    is_personal_schema=True)
+    schemaconf = own.SchemaAnalyzer(ROLES[0], dbobject=DBObject(personal_schema),
+                                    dbcontext=mockdbcontext, is_personal_schema=True)
     actual = schemaconf.analyze()
     expected = [
         own.Q_SET_OBJECT_OWNER.format('TABLE', quoted_object(ROLES[0], TABLES[1]), ROLES[0], ROLES[1]),
@@ -201,7 +205,7 @@ def test_schemaanalyzer_existing_personal_schema_change_object_owners(mockdbcont
 
 
 def test_schemaanalyzer_create_schema(mockdbcontext):
-    schemaconf = own.SchemaAnalyzer(ROLES[0], schema=SCHEMAS[0], dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(ROLES[0], dbobject=DBObject(SCHEMAS[0]), dbcontext=mockdbcontext)
     schemaconf.create_schema()
     assert schemaconf.sql_to_run == [own.Q_CREATE_SCHEMA.format(SCHEMAS[0], ROLES[0])]
 
@@ -210,7 +214,7 @@ def test_schemaanalyzer_set_owner(mockdbcontext):
     previous_owner = ROLES[1]
     mockdbcontext.get_schema_owner = lambda x: previous_owner
 
-    schemaconf = own.SchemaAnalyzer(ROLES[0], schema=SCHEMAS[0], dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(ROLES[0], dbobject=DBObject(SCHEMAS[0]), dbcontext=mockdbcontext)
     schemaconf.set_owner()
 
     expected = [own.Q_SET_SCHEMA_OWNER.format(SCHEMAS[0], ROLES[0], previous_owner)]
@@ -224,7 +228,7 @@ def test_schemaanalyzer_alter_object_owner(mockdbcontext):
     dbobject = DBObject(schema=schema, object_name=TABLES[0])
     mockdbcontext.get_schema_owner = lambda x: owner
 
-    schemaconf = own.SchemaAnalyzer(owner, schema=schema, dbcontext=mockdbcontext)
+    schemaconf = own.SchemaAnalyzer(owner, dbobject=DBObject(schema), dbcontext=mockdbcontext)
     schemaconf.alter_object_owner('tables', dbobject, previous_owner)
     assert schemaconf.sql_to_run == [
         own.Q_SET_OBJECT_OWNER.format('TABLE', dbobject.qualified_name, owner, previous_owner)
@@ -232,27 +236,27 @@ def test_schemaanalyzer_alter_object_owner(mockdbcontext):
 
 
 def test_schemaanalyzer_get_improperly_owned_objects(mockdbcontext):
-    mockdbcontext.get_schema_owner = lambda x: ROLES[0]
+    owner = ROLES[0]
+    wrong_owner = ROLES[1]
+    mockdbcontext.get_schema_owner = lambda x: owner
     mockdbcontext.get_schema_objects = lambda x: [
         # Properly owned
-        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[0]), ROLES[0], False),
-        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[0]), ROLES[0], False),
+        ObjectInfo('tables', DBObject(schema=owner, object_name=TABLES[0]), owner, False),
+        ObjectInfo('sequences', DBObject(schema=owner, object_name=SEQUENCES[0]), owner, False),
 
         # Improperly owned
-        ObjectInfo('tables', DBObject(schema=ROLES[0], object_name=TABLES[1]), ROLES[1], False),
-        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[1]), ROLES[1], False),
+        ObjectInfo('tables', DBObject(schema=owner, object_name=TABLES[1]), wrong_owner, False),
+        ObjectInfo('sequences', DBObject(schema=owner, object_name=SEQUENCES[1]), wrong_owner, False),
 
         # Improperly owned but dependent (i.e. should be skipped)
-        ObjectInfo('sequences', DBObject(schema=ROLES[0], object_name=SEQUENCES[2]), ROLES[1], True),
+        ObjectInfo('sequences', DBObject(schema=owner, object_name=SEQUENCES[2]), wrong_owner, True),
     ]
-    schema = ROLES[0]
-
-    schemaconf = own.SchemaAnalyzer(rolename=ROLES[0], schema=schema, dbcontext=mockdbcontext,
-                                    is_personal_schema=True)
+    schemaconf = own.SchemaAnalyzer(rolename=owner, dbobject=DBObject(owner),
+                                    dbcontext=mockdbcontext, is_personal_schema=True)
 
     actual = schemaconf.get_improperly_owned_objects()
-    expected = [('tables', DBObject(schema=schema, object_name=TABLES[1]), ROLES[1]),
-                ('sequences', DBObject(schema=schema, object_name=SEQUENCES[1]), ROLES[1])]
+    expected = [('tables', DBObject(schema=owner, object_name=TABLES[1]), wrong_owner),
+                ('sequences', DBObject(schema=owner, object_name=SEQUENCES[1]), wrong_owner)]
     assert set(actual) == set(expected)
 
 

@@ -28,7 +28,8 @@ def analyze_ownerships(spec, cursor, verbose):
                 continue
 
             if config.get('has_personal_schema'):
-                sql_to_run = SchemaAnalyzer(rolename=rolename, schema=rolename,
+                dbobject = DBObject.from_str(rolename)
+                sql_to_run = SchemaAnalyzer(rolename=rolename, dbobject=dbobject,
                                             dbcontext=dbcontext, is_personal_schema=True).analyze()
                 all_sql_to_run += sql_to_run
 
@@ -36,7 +37,8 @@ def analyze_ownerships(spec, cursor, verbose):
             for objkind, objects_to_own in ownerships.items():
                 if objkind == 'schemas':
                     for schema in objects_to_own:
-                        sql_to_run = SchemaAnalyzer(rolename=rolename, schema=schema,
+                        dbobject = DBObject.from_str(schema)
+                        sql_to_run = SchemaAnalyzer(rolename=rolename, dbobject=dbobject,
                                                     dbcontext=dbcontext,
                                                     is_personal_schema=False).analyze()
                         all_sql_to_run += sql_to_run
@@ -109,12 +111,12 @@ class SchemaAnalyzer(object):
     personal schema that all objects in it (and that we track, i.e. the keys to the privileges.py
     modules's PRIVILEGE_MAP) are owned by the correct schema owner
     """
-    def __init__(self, rolename, schema, dbcontext, is_personal_schema=False):
+    def __init__(self, rolename, dbobject, dbcontext, is_personal_schema=False):
         """
         Args:
             rolename (str): The name of the role that should own the schema
 
-            schema (str): The schema to analyze
+            dbobject (context.DBObject): The schema to analyze
 
             dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
                 information for the associated database
@@ -124,11 +126,11 @@ class SchemaAnalyzer(object):
         self.sql_to_run = []
         self.rolename = common.check_name(rolename)
         logger.debug('self.rolename set to {}'.format(self.rolename))
-        self.schema = schema
+        self.dbobject = dbobject
         self.is_personal_schema = is_personal_schema
 
-        self.current_owner = dbcontext.get_schema_owner(schema)
-        self.schema_objects = dbcontext.get_schema_objects(schema)
+        self.current_owner = dbcontext.get_schema_owner(self.dbobject.schema)
+        self.schema_objects = dbcontext.get_schema_objects(self.dbobject.schema)
         # If there is no owner then the schema must not exist yet
         self.exists = self.current_owner is not None
 
@@ -165,9 +167,9 @@ class SchemaAnalyzer(object):
         self.sql_to_run.append(query)
 
     def create_schema(self):
-        query = Q_CREATE_SCHEMA.format(self.schema, self.rolename)
+        query = Q_CREATE_SCHEMA.format(self.dbobject.schema, self.rolename)
         self.sql_to_run.append(query)
 
     def set_owner(self):
-        query = Q_SET_SCHEMA_OWNER.format(self.schema, self.rolename, self.current_owner)
+        query = Q_SET_SCHEMA_OWNER.format(self.dbobject.schema, self.rolename, self.current_owner)
         self.sql_to_run.append(query)
