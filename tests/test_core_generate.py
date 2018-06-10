@@ -7,7 +7,7 @@ import pytest
 
 from conftest import quoted_object, run_setup_sql
 from pgbedrock import attributes as attr
-from pgbedrock.context import DatabaseContext
+from pgbedrock.context import DatabaseContext, DBObject
 from pgbedrock import core_generate
 from pgbedrock import ownerships as own
 from pgbedrock import privileges as privs
@@ -295,8 +295,14 @@ def test_add_ownerships(mockdbcontext):
     Q_CREATE_TABLE.format('role3', 'role3', 'table2'),
 ])
 @pytest.mark.parametrize('objects, expected', [
-    (set(['role1.*', 'role3.*']), set(['personal_schemas.*'])),
-    (set(['role1.*', 'role3.table1']), set(['role1.*', 'role3.table1'])),
+    (
+        set([DBObject('role1', '*'), DBObject('role3', '*')]),
+        set([DBObject('personal_schemas', '*')])
+    ),
+    (
+        set([DBObject('role1', '*'), DBObject('role3', 'table1')]),
+        set([DBObject('role1', '*'), DBObject('role3', 'table1')])
+    ),
 ])
 def test_collapse_personal_schemas(cursor, objects, expected):
     dbcontext = DatabaseContext(cursor, verbose=True)
@@ -327,8 +333,14 @@ def test_collapse_personal_schemas(cursor, objects, expected):
     Q_CREATE_TABLE.format('role3', 'role3', 'table2'),
 ])
 @pytest.mark.parametrize('objects, expected', [
-    (set(['role1.*', 'role3.*']), set(['personal_schemas.*'])),
-    (set(['role1.*', 'role2.*', 'role3.*']), set(['personal_schemas.*', 'role2.*'])),
+    (
+        set([DBObject('role1', '*'), DBObject('role3', '*')]),
+        set([DBObject('personal_schemas', '*')])
+    ),
+    (
+        set([DBObject('role1', '*'), DBObject('role2', '*'), DBObject('role3', '*')]),
+        set([DBObject('personal_schemas', '*'), DBObject('role2', '*')])
+    ),
 ])
 def test_collapse_personal_schemas_only_logginable_roles(cursor, objects, expected):
     dbcontext = DatabaseContext(cursor, verbose=True)
@@ -338,7 +350,7 @@ def test_collapse_personal_schemas_only_logginable_roles(cursor, objects, expect
 
 
 def test_collapse_personal_schemas_no_personal_schemas_exist(cursor):
-    objects = set(['role1.*', 'role2.foo', 'role3.bar'])
+    objects = set([DBObject('role1', '*'), DBObject('role2', 'foo'), DBObject('role3', 'bar')])
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.collapse_personal_schemas(role='role0', objects=objects,
                                                      objkind='tables', dbcontext=dbcontext)
@@ -362,10 +374,50 @@ def test_collapse_personal_schemas_no_personal_schemas_exist(cursor):
 ])
 def test_collapse_personal_schemas_empty_schema_with_default_priv(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
-    objects = set(['role1.*', 'role2.*'])
+    objects = set([DBObject('role1', '*'), DBObject('role2', '*')])
     actual = core_generate.collapse_personal_schemas(role='role0', objects=objects,
                                                      objkind='tables', dbcontext=dbcontext)
-    expected = set(['personal_schemas.*'])
+    expected = set([DBObject('personal_schemas', '*')])
+    assert actual == expected
+
+
+@run_setup_sql([
+    # role0 is who we care about; role1 is just another user to own things
+    attr.Q_CREATE_ROLE.format('role0'),
+    attr.Q_CREATE_ROLE.format('role1'),
+
+    # Create schemas owned by the other role (role1)
+    own.Q_CREATE_SCHEMA.format('schema0', 'role1'),
+    own.Q_CREATE_SCHEMA.format('schema1', 'role1'),
+
+    # Create objects in schema0 and grant write access on all of them to role0
+    Q_CREATE_TABLE.format('role1', 'schema0', 'table0'),
+    Q_CREATE_TABLE.format('role1', 'schema0', 'table1'),
+    privs.Q_GRANT_NONDEFAULT.format('INSERT', 'TABLE', 'schema0.table0', 'role0'),
+    privs.Q_GRANT_NONDEFAULT.format('INSERT', 'TABLE', 'schema0.table1', 'role0'),
+
+    # Create one schema owned by role0
+    own.Q_CREATE_SCHEMA.format('schema3', 'role0'),
+
+    privs.Q_GRANT_NONDEFAULT.format('USAGE', 'SCHEMA', 'schema0', 'role0'),
+])
+def test_add_privileges(cursor):
+    spec = {'role0': {}}
+    dbcontext = DatabaseContext(cursor, verbose=True)
+    actual = core_generate.add_privileges(spec, dbcontext)
+    expected = {
+        'role0': {
+            'privileges': {
+                'schemas': {
+                    'read': ['schema0'],
+                    'write': ['schema3'],
+                },
+                'tables': {
+                    'write': ['schema0."*"'],
+                },
+            },
+        },
+    }
     assert actual == expected
 
 
@@ -388,7 +440,7 @@ def test_collapse_personal_schemas_empty_schema_with_default_priv(cursor):
     privs.Q_GRANT_NONDEFAULT.format('USAGE', 'SCHEMA', 'schema2', 'role0'),
     privs.Q_GRANT_NONDEFAULT.format('USAGE', 'SCHEMA', 'schema3', 'role0'),
 
-    # Grant various read access to role0 (including to the schema it owns)
+    # Grant various write access to role0 (including to the schema it owns)
     privs.Q_GRANT_NONDEFAULT.format('CREATE', 'SCHEMA', 'schema2', 'role0'),
     privs.Q_GRANT_NONDEFAULT.format('CREATE', 'SCHEMA', 'schema3', 'role0'),
 ])
@@ -525,7 +577,7 @@ def test_determine_nonschema_privileges_for_schema_no_objects_with_default_priv(
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
     assert actw == set()
-    assert actr == set(['schema0.*'])
+    assert actr == set([DBObject(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -562,7 +614,7 @@ def test_determine_nonschema_privileges_for_schema_default_write(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0.*'])
+    assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -584,7 +636,7 @@ def test_determine_nonschema_privileges_for_schema_has_all_writes(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0.*'])
+    assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -608,8 +660,8 @@ def test_determine_nonschema_privileges_for_schema_some_write_default_read(curso
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0."table0"'])
-    assert actr == set(['schema0.*'])
+    assert actw == set([DBObject(schema='schema0', object_name='table0')])
+    assert actr == set([DBObject(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -631,7 +683,7 @@ def test_determine_nonschema_privileges_for_schema_no_writes_all_reads(cursor):
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
     assert actw == set()
-    assert actr == set(['schema0.*'])
+    assert actr == set([DBObject(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -656,8 +708,11 @@ def test_determine_nonschema_privileges_for_schema_some_writes_some_reads(cursor
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0."table1"', 'schema0."table2"'])
-    assert actr == set(['schema0."table0"'])
+    assert actw == set([
+        DBObject(schema='schema0', object_name='table1'),
+        DBObject(schema='schema0', object_name='table2'),
+    ])
+    assert actr == set([DBObject(schema='schema0', object_name='table0')])
 
 
 @run_setup_sql([
@@ -680,7 +735,7 @@ def test_determine_nonschema_privileges_for_schema_all_writes(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0.*'])
+    assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -704,7 +759,7 @@ def test_determine_nonschema_privileges_for_schema_default_write_some_reads(curs
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0.*'])
+    assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -724,7 +779,7 @@ def test_determine_nonschema_privileges_for_schema_default_write_and_default_rea
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
-    assert actw == set(['schema0.*'])
+    assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -747,7 +802,7 @@ def test_determine_nonschema_privileges_for_schema_no_write_all_reads(cursor):
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
     assert actw == set()
-    assert actr == set(['schema0.*'])
+    assert actr == set([DBObject(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -768,7 +823,7 @@ def test_determine_nonschema_privileges_for_schema_no_writes_some_reads(cursor):
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          'schema0', dbcontext)
     assert actw == set()
-    assert actr == set(['schema0."table0"'])
+    assert actr == set([DBObject(schema='schema0', object_name='table0')])
 
 
 @run_setup_sql([
@@ -820,8 +875,8 @@ def test_determine_nonschema_privileges_for_schema_no_objects_of_objkind(cursor)
 def test_determine_all_nonschema_privileges(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_all_nonschema_privileges('role0', 'tables', dbcontext)
-    assert actw == set(['schema0.*'])
-    assert actr == set(['schema1."table3"'])
+    assert actw == set([DBObject(schema='schema0', object_name='*')])
+    assert actr == set([DBObject(schema='schema1', object_name='table3')])
 
 
 def test_initialize_spec(mockdbcontext):
