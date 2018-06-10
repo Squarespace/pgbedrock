@@ -572,9 +572,13 @@ class DatabaseContext(object):
         return role_memberships
 
     def get_all_personal_schemas(self):
-        """ Return all personal schemas as a set """
+        """ Return all personal schemas
+
+        Returns:
+            set: A set of DBObject instances
+        """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_PERSONAL_SCHEMAS)
-        personal_schemas = set([i[0] for i in self.cursor.fetchall()])
+        personal_schemas = set([DBObject(schema=row[0]) for row in self.cursor.fetchall()])
         return personal_schemas
 
     def get_all_nonschema_objects_and_owners(self):

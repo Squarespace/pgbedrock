@@ -117,7 +117,7 @@ def test_add_schema_ownerships(mockdbcontext):
         # Would not show up in get_all_personal_schemas as can_login is False
         'owner2': 'owner2',
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set(['owner1'])
+    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner1')])
 
     spec = {
         'owner1': {'can_login': True},
@@ -157,7 +157,7 @@ def test_add_nonschema_ownerships(mockdbcontext):
         },
         'sequences': {},
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set(['owner3', 'owner5'])
+    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner3'), DBObject('owner5')])
 
     spec = {
         'owner1': {
@@ -189,7 +189,7 @@ def test_add_nonschema_ownerships_empty_objkinds(mockdbcontext, objkind):
         },
         'sequences': {},
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set(['owner4', 'owner5'])
+    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner4'), DBObject('owner5')])
 
     spec = {
         'owner1': {
@@ -245,7 +245,7 @@ def test_add_ownerships(mockdbcontext):
         # Personal schema
         'owner3': 'owner3',
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set(['owner3'])
+    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner3')])
 
     spec = {
         'owner1': {},

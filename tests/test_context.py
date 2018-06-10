@@ -360,7 +360,7 @@ def test_get_all_object_attributes(cursor):
 def test_get_all_personal_schemas(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     actual = dbcontext.get_all_personal_schemas()
-    expected = set(ROLES[1:3])
+    expected = set([context.DBObject(schema) for schema in ROLES[1:3]])
     assert actual == expected
 
     # Make sure that this data is cached for future use

@@ -74,7 +74,10 @@ def add_schema_ownerships(spec, dbcontext):
     objects in that schema that are not owned by the schema owner they will have their ownership
     changed (to be the same as the schema owner).
     """
-    personal_schemas = dbcontext.get_all_personal_schemas()
+    personal_schemas_raw = dbcontext.get_all_personal_schemas()
+    #TODO: Remove this transformation
+    personal_schemas = set([schema.qualified_name for schema in personal_schemas_raw])
+
     schemas_and_owners = dbcontext.get_all_schemas_and_owners()
 
     for schema, owner in schemas_and_owners.items():
@@ -102,7 +105,10 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
     their ownership is tied to the object they depend on. Additionally, objects in personal schemas
     are skipped as they are managed by ownerships.py as part of the personal schema ownership.
     """
-    personal_schemas = dbcontext.get_all_personal_schemas()
+    personal_schemas_raw = dbcontext.get_all_personal_schemas()
+    #TODO: Remove this transformation
+    personal_schemas = set([schema.qualified_name for schema in personal_schemas_raw])
+
     all_objects_and_owners = dbcontext.get_all_object_attributes()
     objects_and_owners = all_objects_and_owners.get(objkind, {})
 
@@ -205,18 +211,18 @@ def collapse_personal_schemas(role, objects, objkind, dbcontext):
         set
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
-    all_personal_schemas = set([DBObject(schema=schema, object_name='*') for schema in personal_schemas])
+    personal_schemas_star = set([DBObject(schema=dbo.schema, object_name='*') for dbo in personal_schemas])
 
-    if not all_personal_schemas:
+    if not personal_schemas_star:
         return objects
 
     non_empty_personal_schemas = set()
-    for schema in personal_schemas:
-        if schema != role and not dbcontext.is_schema_empty(schema, objkind):
-            non_empty_personal_schemas.add(DBObject(schema=schema, object_name='*'))
+    for dbo in personal_schemas:
+        if dbo.schema != role and not dbcontext.is_schema_empty(dbo.schema, objkind):
+            non_empty_personal_schemas.add(DBObject(schema=dbo.schema, object_name='*'))
 
     if non_empty_personal_schemas.difference(objects) == set():
-        objects.difference_update(all_personal_schemas)
+        objects.difference_update(personal_schemas_star)
         objects.add(DBObject(schema='personal_schemas', object_name='*'))
 
     return objects
@@ -239,7 +245,9 @@ def determine_schema_privileges(role, dbcontext):
     read privileges as well).
     """
     # Make a copy of personal_schemas (by making a new set from it) as we will be mutating it
-    personal_schemas = set(dbcontext.get_all_personal_schemas())
+    #TODO: Remove this transformation
+    personal_schemas_dbo = set(dbcontext.get_all_personal_schemas())
+    personal_schemas = {dbo.qualified_name for dbo in personal_schemas_dbo}
 
     # Get all schemas this role has write and read access to
     write_schemas_and_owners = dbcontext.get_role_current_nondefaults(role, 'schemas', 'write')
