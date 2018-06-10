@@ -119,8 +119,8 @@ class SchemaAnalyzer(object):
         if self.is_personal_schema:
             # Make it true that all tables in the personal schema are owned by the schema owner
             objects_to_change = self.get_improperly_owned_objects()
-            for objkind, objname, prev_owner in objects_to_change:
-                self.alter_object_owner(objkind, objname, prev_owner)
+            for objkind, dbobject, prev_owner in objects_to_change:
+                self.alter_object_owner(objkind, dbobject, prev_owner)
 
         return self.sql_to_run
 
@@ -129,16 +129,17 @@ class SchemaAnalyzer(object):
         auto-dependent (i.e. a sequence that is linked to a table, in which case its ownership
         derives from that linked table). Note that we only look at objects supported by pgbedrock
         (i.e. tables and sequences). Each entry returned is a tuple of the form
-        (objkind, objname, current_owner) """
+        (objkind, context.DBObject, current_owner) """
         objects = []
         for item in self.schema_objects:
             if item.owner != self.rolename and not item.is_dependent:
-                objects.append((item.kind, item.dbobject.qualified_name, item.owner))
+                objects.append((item.kind, item.dbobject, item.owner))
         return objects
 
-    def alter_object_owner(self, objkind, objname, prev_owner):
+    def alter_object_owner(self, objkind, dbobject, prev_owner):
         obj_kind_singular = objkind.upper()[:-1]
-        query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname, self.rolename, prev_owner)
+        query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, dbobject.qualified_name,
+                                          self.rolename, prev_owner)
         self.sql_to_run.append(query)
 
     def create_schema(self):

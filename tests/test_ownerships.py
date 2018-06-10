@@ -221,12 +221,14 @@ def test_schemaanalyzer_alter_object_owner(mockdbcontext):
     previous_owner = ROLES[1]
     owner = ROLES[0]
     schema = SCHEMAS[0]
-    table_name = quoted_object(schema, TABLES[0])
+    dbobject = DBObject(schema=schema, object_name=TABLES[0])
     mockdbcontext.get_schema_owner = lambda x: owner
 
     schemaconf = own.SchemaAnalyzer(owner, schema=schema, dbcontext=mockdbcontext)
-    schemaconf.alter_object_owner('tables', table_name, previous_owner)
-    assert schemaconf.sql_to_run == [own.Q_SET_OBJECT_OWNER.format('TABLE', table_name, owner, previous_owner)]
+    schemaconf.alter_object_owner('tables', dbobject, previous_owner)
+    assert schemaconf.sql_to_run == [
+        own.Q_SET_OBJECT_OWNER.format('TABLE', dbobject.qualified_name, owner, previous_owner)
+    ]
 
 
 def test_schemaanalyzer_get_improperly_owned_objects(mockdbcontext):
@@ -249,8 +251,8 @@ def test_schemaanalyzer_get_improperly_owned_objects(mockdbcontext):
                                     is_personal_schema=True)
 
     actual = schemaconf.get_improperly_owned_objects()
-    expected = [('tables', quoted_object(schema, TABLES[1]), ROLES[1]),
-                ('sequences', quoted_object(schema, SEQUENCES[1]), ROLES[1])]
+    expected = [('tables', DBObject(schema=schema, object_name=TABLES[1]), ROLES[1]),
+                ('sequences', DBObject(schema=schema, object_name=SEQUENCES[1]), ROLES[1])]
     assert set(actual) == set(expected)
 
 
