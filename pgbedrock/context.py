@@ -518,11 +518,11 @@ class DatabaseContext(object):
         """ Return a dict of the form:
             {objkindA: {
                 'schemaA': {
-                    'objnameA': {
+                    'dbobjectA': {
                         'owner': ownerA,
                         'is_dependent': False,
                         },
-                    'objnameB': {
+                    'dbobjectB': {
                         'owner': ownerB,
                         'is_dependent': True,
                         },
@@ -544,9 +544,8 @@ class DatabaseContext(object):
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            # TODO: Remove this qualified_name
-            objkind_owners[row.schema][row.dbobject.qualified_name] = {'owner': row.owner,
-                                                                       'is_dependent': row.is_dependent}
+            objkind_owners[row.schema][row.dbobject] = {'owner': row.owner,
+                                                        'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -559,7 +558,9 @@ class DatabaseContext(object):
         """ Return a dict of {schema_name: schema_owner} """
         all_object_owners = self.get_all_object_attributes()
         schemas_subdict = all_object_owners.get('schemas', {})
-        schema_owners = {k: v[k]['owner'] for k, v in schemas_subdict.items()}
+        schema_owners = dict()
+        for schema, attributes in schemas_subdict.items():
+            schema_owners[schema] = attributes[DBObject(schema)]['owner']
         return schema_owners
 
     def get_schema_owner(self, schema):

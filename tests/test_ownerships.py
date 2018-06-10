@@ -260,25 +260,26 @@ def test_nonschemaanalyzer_expand_schema_objects(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[0]): {'owner': DUMMY, 'is_dependent': False},
-                quoted_object(SCHEMAS[0], TABLES[1]): {'owner': DUMMY, 'is_dependent': False},
-                quoted_object(SCHEMAS[0], TABLES[2]): {'owner': DUMMY, 'is_dependent': True},
+                DBObject(SCHEMAS[0], TABLES[0]): {'owner': DUMMY, 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[1]): {'owner': DUMMY, 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[2]): {'owner': DUMMY, 'is_dependent': True},
             },
         },
     }
     nsa = own.NonschemaAnalyzer(rolename=ROLES[0], objname=DUMMY,
                                 objkind='tables', dbcontext=mockdbcontext)
     actual = nsa.expand_schema_objects(SCHEMAS[0])
-    expected = [quoted_object(SCHEMAS[0], TABLES[0]), quoted_object(SCHEMAS[0], TABLES[1])]
+    expected = [DBObject(SCHEMAS[0], TABLES[0]), DBObject(SCHEMAS[0], TABLES[1])]
     assert set(actual) == set(expected)
 
 
 def test_nonschemaanalyzer_analyze_no_changed_needed(mockdbcontext):
     objname = quoted_object(SCHEMAS[0], TABLES[0])
+    dbo = DBObject(SCHEMAS[0], TABLES[0])
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                objname: {'owner': ROLES[0], 'is_dependent': False},
+                dbo: {'owner': ROLES[0], 'is_dependent': False},
             },
         },
     }
@@ -290,10 +291,11 @@ def test_nonschemaanalyzer_analyze_no_changed_needed(mockdbcontext):
 
 def test_nonschemaanalyzer_analyze_without_schema_expansion(mockdbcontext):
     objname = quoted_object(SCHEMAS[0], TABLES[0])
+    dbo = DBObject(SCHEMAS[0], TABLES[0])
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                objname: {'owner': ROLES[1], 'is_dependent': False},
+                dbo: {'owner': ROLES[1], 'is_dependent': False},
             },
         },
     }
@@ -308,12 +310,12 @@ def test_nonschemaanalyzer_analyze_with_schema_expansion(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'sequences': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
-                quoted_object(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
                 # This will be skipped as the owner is correct
-                quoted_object(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[0], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[0], 'is_dependent': False},
                 # This will be skipped as it is dependent
-                quoted_object(SCHEMAS[0], SEQUENCES[3]): {'owner': ROLES[1], 'is_dependent': True},
+                DBObject(SCHEMAS[0], SEQUENCES[3]): {'owner': ROLES[1], 'is_dependent': True},
             },
         },
     }
@@ -321,9 +323,9 @@ def test_nonschemaanalyzer_analyze_with_schema_expansion(mockdbcontext):
                                 objkind='sequences', dbcontext=mockdbcontext)
     actual = nsa.analyze()
     expected = [
-        own.Q_SET_OBJECT_OWNER.format('SEQUENCE', quoted_object(SCHEMAS[0], SEQUENCES[0]),
+        own.Q_SET_OBJECT_OWNER.format('SEQUENCE', DBObject(SCHEMAS[0], SEQUENCES[0]).qualified_name,
                                       ROLES[0], ROLES[1]),
-        own.Q_SET_OBJECT_OWNER.format('SEQUENCE', quoted_object(SCHEMAS[0], SEQUENCES[1]),
+        own.Q_SET_OBJECT_OWNER.format('SEQUENCE', DBObject(SCHEMAS[0], SEQUENCES[1]).qualified_name,
                                       ROLES[0], ROLES[2]),
     ]
     assert set(actual) == set(expected)

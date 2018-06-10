@@ -5,7 +5,7 @@ import itertools
 import click
 
 from pgbedrock import common
-from pgbedrock.context import DatabaseContext, PRIVILEGE_MAP
+from pgbedrock.context import DatabaseContext, DBObject, PRIVILEGE_MAP
 
 
 logger = logging.getLogger(__name__)
@@ -249,9 +249,15 @@ class PrivilegeAnalyzer(object):
 
     def get_object_owner(self, item, objkind=None):
         objkind = objkind or self.object_kind
+        # TODO: Remove this
         schema = item.split('.', 1)[0]
+        if '.' in item:
+            objname = item.split('.', 1)[1]
+        else:
+            objname = None
+        dbo = DBObject(schema=schema, object_name=objname)
         object_owners = self.all_object_attrs.get(objkind, dict()).get(schema, dict())
-        owner = object_owners.get(item, dict()).get('owner', None)
+        owner = object_owners.get(dbo, dict()).get('owner', None)
         if owner:
             return owner
         else:
@@ -263,7 +269,7 @@ class PrivilegeAnalyzer(object):
         """ Get all objects of kind self.object_kind which are in the given schema and not owned by
         self.rolename """
         object_owners = self.all_object_attrs.get(self.object_kind, dict()).get(schema, dict())
-        return {name for name, attr in object_owners.items() if attr['owner'] != self.rolename}
+        return {dbo.qualified_name for dbo, attr in object_owners.items() if attr['owner'] != self.rolename}
 
     def get_schema_owner(self, schema):
         return self.get_object_owner(schema, objkind='schemas')

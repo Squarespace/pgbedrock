@@ -105,16 +105,13 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
     their ownership is tied to the object they depend on. Additionally, objects in personal schemas
     are skipped as they are managed by ownerships.py as part of the personal schema ownership.
     """
-    personal_schemas_raw = dbcontext.get_all_personal_schemas()
-    #TODO: Remove this transformation
-    personal_schemas = set([schema.qualified_name for schema in personal_schemas_raw])
-
+    personal_schemas = dbcontext.get_all_personal_schemas()
     all_objects_and_owners = dbcontext.get_all_object_attributes()
     objects_and_owners = all_objects_and_owners.get(objkind, {})
 
     for schema, objects_and_attributes in objects_and_owners.items():
         # Skip objects in personal schemas; their ownership is already managed by ownerships.py
-        if schema in personal_schemas:
+        if DBObject(schema=schema) in personal_schemas:
             continue
 
         all_owners = set()
@@ -131,12 +128,13 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
             elif objkind not in spec[owner]['owns']:
                 spec[owner]['owns'][objkind] = []
 
-            spec[owner]['owns'][objkind].append('{}.*'.format(schema))
+            dbo = DBObject(schema=schema, object_name='*')
+            spec[owner]['owns'][objkind].append(dbo.qualified_name)
 
             # Since all objects in this schema are owned by one role, we can skip the below
             continue
 
-        for objname, objattr in objects_and_attributes.items():
+        for dbo, objattr in objects_and_attributes.items():
             # Skip dependent objects; their ownership is managed by the object they depend on
             if objattr['is_dependent']:
                 continue
@@ -147,7 +145,7 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
             elif objkind not in spec[owner]['owns']:
                 spec[owner]['owns'][objkind] = []
 
-            spec[owner]['owns'][objkind].append(objname)
+            spec[owner]['owns'][objkind].append(dbo.qualified_name)
 
     return spec
 

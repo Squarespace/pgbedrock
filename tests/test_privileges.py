@@ -237,7 +237,7 @@ def test_init_default_acl_possible(object_kind, mockdbcontext):
 
 def test_get_schema_objects_tables(mockdbcontext):
     objattributes = {'owner': ROLES[0], 'is_dependent': False}
-    all_attributes = {quoted_object(SCHEMAS[0], t): objattributes for t in TABLES}
+    all_attributes = {DBObject(SCHEMAS[0], t): objattributes for t in TABLES}
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: all_attributes
@@ -258,7 +258,7 @@ def test_get_schema_objects_sequences(mockdbcontext):
     """ While this test is almost identical to test_get_schema_objects_tables(), it's here because
     we want to ensure we have coverage over more than just tables """
     objattributes = {'owner': ROLES[0], 'is_dependent': False}
-    all_attributes = {quoted_object(SCHEMAS[0], seq): objattributes for seq in SEQUENCES}
+    all_attributes = {DBObject(SCHEMAS[0], seq): objattributes for seq in SEQUENCES}
     mockdbcontext.get_all_object_attributes = lambda: {
         'sequences': {
             SCHEMAS[0]: all_attributes
@@ -283,15 +283,15 @@ def test_get_object_owner(mockdbcontext, object_kind, item, expected):
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {
             SCHEMAS[0]: {
-                SCHEMAS[0]: {'owner': ROLES[0], 'is_dependent': False},
+                DBObject(SCHEMAS[0]): {'owner': ROLES[0], 'is_dependent': False},
             },
         }, 'sequences': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
             },
         }, 'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[1]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[1]): {'owner': ROLES[2], 'is_dependent': False},
             },
         },
     }
@@ -322,7 +322,7 @@ def test_get_schema_owner(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {
             SCHEMAS[0]: {
-                SCHEMAS[0]: {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[0]): {'owner': ROLES[1], 'is_dependent': False},
             },
         },
     }
@@ -374,17 +374,17 @@ def test_identify_desired_objects(rolename, mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'sequences': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
-                quoted_object(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
-                quoted_object(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[2], 'is_dependent': False},
             }, SCHEMAS[1]: {
-                quoted_object(SCHEMAS[1], SEQUENCES[0]): {'owner': ROLES[2], 'is_dependent': False},
-                quoted_object(SCHEMAS[1], SEQUENCES[1]): {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[1], SEQUENCES[0]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[1], SEQUENCES[1]): {'owner': ROLES[1], 'is_dependent': False},
             },
         },
         'schemas': {
-            SCHEMAS[0]: {SCHEMAS[0]: {'owner': ROLES[0]}, 'is_dependent': False},
-            SCHEMAS[1]: {SCHEMAS[1]: {'owner': ROLES[0]}, 'is_dependent': False},
+            SCHEMAS[0]: {DBObject(SCHEMAS[0]): {'owner': ROLES[0]}, 'is_dependent': False},
+            SCHEMAS[1]: {DBObject(SCHEMAS[1]): {'owner': ROLES[0]}, 'is_dependent': False},
         },
     }
 
@@ -436,8 +436,8 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_schema(mockdbc
     that the personal schemas do show up """
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {
-            SCHEMAS[0]: {SCHEMAS[0]: {'owner': ROLES[0]}, 'is_dependent': False},
-            SCHEMAS[1]: {SCHEMAS[1]: {'owner': ROLES[0]}, 'is_dependent': False},
+            SCHEMAS[0]: {DBObject(SCHEMAS[0]): {'owner': ROLES[0]}, 'is_dependent': False},
+            SCHEMAS[1]: {DBObject(SCHEMAS[1]): {'owner': ROLES[0]}, 'is_dependent': False},
         },
     }
     personal_schemas = ROLES[1:3]
@@ -463,20 +463,26 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_not_schema(moc
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[0]): {'owner': ROLES[1], 'is_dependent': False},
             },
             ROLES[2]: {
-                quoted_object(ROLES[2], TABLES[2]): {'owner': ROLES[2], 'is_dependent': False},
-                quoted_object(ROLES[2], TABLES[3]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(ROLES[2], TABLES[2]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(ROLES[2], TABLES[3]): {'owner': ROLES[2], 'is_dependent': False},
             },
             ROLES[3]: {
-                quoted_object(ROLES[3], TABLES[4]): {'owner': ROLES[3], 'is_dependent': False},
-                quoted_object(ROLES[3], TABLES[5]): {'owner': ROLES[3], 'is_dependent': False},
+                DBObject(ROLES[3], TABLES[4]): {'owner': ROLES[3], 'is_dependent': False},
+                DBObject(ROLES[3], TABLES[5]): {'owner': ROLES[3], 'is_dependent': False},
             },
         }, 'schemas': {
-            SCHEMAS[0]: {SCHEMAS[0]: {'owner': ROLES[1]}, 'is_dependent': False},
-            ROLES[2]: {ROLES[2]: {'owner': ROLES[2]}, 'is_dependent': False},
-            ROLES[3]: {ROLES[3]: {'owner': ROLES[3]}, 'is_dependent': False},
+            SCHEMAS[0]: {
+                DBObject(SCHEMAS[0]): {'owner': ROLES[1]}, 'is_dependent': False
+            },
+            ROLES[2]: {
+                DBObject(ROLES[2]): {'owner': ROLES[2]}, 'is_dependent': False
+            },
+            ROLES[3]: {
+                DBObject(ROLES[3]): {'owner': ROLES[3]}, 'is_dependent': False
+            },
         },
     }
     personal_schemas = ROLES[2:4]
@@ -595,12 +601,12 @@ def test_analyze_defaults(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[0]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[0]): {'owner': ROLES[2], 'is_dependent': False},
             },
         },
         'schemas': {
             SCHEMAS[0]: {
-                SCHEMAS[0]: {'owner': ROLES[1], 'is_dependent': False},
+                DBObject(SCHEMAS[0]): {'owner': ROLES[1], 'is_dependent': False},
             },
         },
     }
@@ -646,17 +652,21 @@ def test_analyze_nondefaults(mockdbcontext):
     ])
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {
-            SCHEMAS[0]: {SCHEMAS[0]: {'owner': ROLES[1], 'is_dependent': False}},
-            SCHEMAS[1]: {SCHEMAS[1]: {'owner': ROLES[1], 'is_dependent': False}},
+            SCHEMAS[0]: {
+                DBObject(SCHEMAS[0]): {'owner': ROLES[1], 'is_dependent': False}
+            },
+            SCHEMAS[1]: {
+                DBObject(SCHEMAS[1]): {'owner': ROLES[1], 'is_dependent': False}
+            },
         },
         'tables': {
             SCHEMAS[0]: {
-                quoted_object(SCHEMAS[0], TABLES[0]): {'owner': ROLES[2], 'is_dependent': False},
-                quoted_object(SCHEMAS[0], TABLES[1]): {'owner': ROLES[3], 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[0]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[0], TABLES[1]): {'owner': ROLES[3], 'is_dependent': False},
             },
             SCHEMAS[1]: {
-                quoted_object(SCHEMAS[1], TABLES[2]): {'owner': ROLES[2], 'is_dependent': False},
-                quoted_object(SCHEMAS[1], TABLES[3]): {'owner': ROLES[3], 'is_dependent': False},
+                DBObject(SCHEMAS[1], TABLES[2]): {'owner': ROLES[2], 'is_dependent': False},
+                DBObject(SCHEMAS[1], TABLES[3]): {'owner': ROLES[3], 'is_dependent': False},
             },
         }
     }

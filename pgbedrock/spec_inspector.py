@@ -103,22 +103,22 @@ def ensure_no_object_owned_twice(spec, dbcontext, objkind):
 
         role_owned_objects = config['owns'][objkind]
         for objname in role_owned_objects:
-            if objname.endswith('.*'):
-                schema = objname[:-2]
-                schema_objects = all_db_objects.get(schema, dict())
+            dbo = context.DBObject.from_str(objname)
+            if dbo.object_name == '*':
+                schema_objects = all_db_objects.get(dbo.schema, dict())
                 nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
                 for obj in nondependent_objects:
                     object_ownerships[obj].append(rolename)
             else:
-                quoted_objname = common.ensure_quoted_identifier(objname)
-                object_ownerships[quoted_objname].append(rolename)
+                object_ownerships[dbo].append(rolename)
 
     error_messages = []
-    for quoted_objname, owners in object_ownerships.items():
+    for dbo, owners in object_ownerships.items():
         if len(owners) > 1:
             owners_formatted = ", ".join(sorted(owners))
             error_messages.append(MULTIPLE_OBJKIND_OWNER_ERR_MSG.format(objkind[:-1].capitalize(),
-                                                                        quoted_objname, owners_formatted))
+                                                                        dbo.qualified_name,
+                                                                        owners_formatted))
 
     return error_messages
 
@@ -242,7 +242,7 @@ def ensure_no_missing_objects(spec, dbcontext, objkind):
     db_objects = set()
     for obj in dbcontext.get_all_raw_object_attributes():
         if obj.kind == objkind and not obj.is_dependent:
-            db_objects.add(obj.dbobject.qualified_name)
+            db_objects.add(obj.dbobject)
 
     db_objects_by_schema = dbcontext.get_all_object_attributes().get(objkind, dict())
     spec_objects = set()
@@ -261,27 +261,28 @@ def ensure_no_missing_objects(spec, dbcontext, objkind):
 
         role_owned_objects = config['owns'][objkind]
         for objname in role_owned_objects:
-            if objname.endswith('.*'):
-                schema = objname[:-2]
-                schema_objects = db_objects_by_schema.get(schema, dict())
+            dbo = context.DBObject.from_str(objname)
+            if dbo.object_name == '*':
+                schema_objects = db_objects_by_schema.get(dbo.schema, dict())
                 nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
                 for obj in nondependent_objects:
                     spec_objects.add(obj)
             else:
-                quoted_objname = common.ensure_quoted_identifier(objname)
-                spec_objects.add(quoted_objname)
+                spec_objects.add(dbo)
 
     error_messages = []
 
     not_in_db = spec_objects.difference(db_objects)
     if not_in_db:
-        unknown_objects = ', '.join(sorted(not_in_db))
+        qualified_names = [dbo.qualified_name for dbo in not_in_db]
+        unknown_objects = ', '.join(sorted(qualified_names))
         msg = UNKNOWN_OBJECTS_MSG.format(objkind=objkind, unknown_objects=unknown_objects)
         error_messages.append(msg)
 
     not_in_spec = db_objects.difference(spec_objects)
     if not_in_spec:
-        unowned_objects = ', '.join(sorted(not_in_spec))
+        qualified_names = [dbo.qualified_name for dbo in not_in_spec]
+        unowned_objects = ', '.join(sorted(qualified_names))
         msg = UNOWNED_OBJECTS_MSG.format(objkind=objkind, unowned_objects=unowned_objects)
         error_messages.append(msg)
 
@@ -316,22 +317,22 @@ def ensure_no_dependent_object_is_owned(spec, dbcontext, objkind):
 
         role_owned_objects = config['owns'][objkind]
         for objname in role_owned_objects:
-            if objname.endswith('.*'):
+            dbo = context.DBObject.from_str(objname)
+            if dbo.object_name == '*':
                 continue
 
-            schema = objname.split('.')[0]
-            quoted_objname = common.ensure_quoted_identifier(objname)
             try:
-                obj_is_dependent = all_db_objects[schema][quoted_objname]['is_dependent']
+                obj_is_dependent = all_db_objects[dbo.schema][dbo]['is_dependent']
             except KeyError:
                 # This object is missing in the db; that condition already being checked elsewhere
                 continue
 
             if obj_is_dependent:
-                owned_dependent_objects.append(quoted_objname)
+                owned_dependent_objects.append(dbo)
 
     if owned_dependent_objects:
-        dep_objs = ', '.join(sorted(owned_dependent_objects))
+        qualified_names = [dbo.qualified_name for dbo in owned_dependent_objects]
+        dep_objs = ', '.join(sorted(qualified_names))
         msg = DEPENDENT_OBJECTS_MSG.format(objkind=objkind, dep_objs=dep_objs)
         return [msg]
 

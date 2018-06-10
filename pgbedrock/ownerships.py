@@ -3,7 +3,7 @@ import logging
 import click
 
 from pgbedrock import common
-from pgbedrock.context import DatabaseContext
+from pgbedrock.context import DatabaseContext, DBObject
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class NonschemaAnalyzer(object):
         """ Get all non-dependent objects of kind objkind within the specified schema """
         all_objkind_objects = self.dbcontext.get_all_object_attributes().get(self.objkind, dict())
         schema_objects = all_objkind_objects.get(schema, dict())
-        nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+        nondependent_objects = [dbo for dbo, attr in schema_objects.items() if not attr['is_dependent']]
         return nondependent_objects
 
     def analyze(self):
@@ -77,15 +77,15 @@ class NonschemaAnalyzer(object):
         if self.objname.endswith('.*'):
             objects_to_manage = self.expand_schema_objects(schema)
         else:
-            objects_to_manage = [self.objname]
+            objects_to_manage = [DBObject.from_str(self.objname)]
 
         all_object_attributes = self.dbcontext.get_all_object_attributes()
-        for objname in objects_to_manage:
-            current_owner = all_object_attributes[self.objkind][schema][objname]['owner']
+        for dbobject in objects_to_manage:
+            current_owner = all_object_attributes[self.objkind][schema][dbobject]['owner']
             if current_owner != self.rolename:
                 obj_kind_singular = self.objkind.upper()[:-1]
-                query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname, self.rolename,
-                                                  current_owner)
+                query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, dbobject.qualified_name,
+                                                  self.rolename, current_owner)
                 self.sql_to_run.append(query)
 
         return self.sql_to_run
@@ -99,6 +99,17 @@ class SchemaAnalyzer(object):
     modules's PRIVILEGE_MAP) are owned by the correct schema owner
     """
     def __init__(self, rolename, schema, dbcontext, is_personal_schema=False):
+        """
+        Args:
+            rolename (str): The name of the role that should own the schema
+
+            schema (str): The schema to analyze
+
+            dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
+                information for the associated database
+
+            is_personal_schemas (bool): Whether this is a personal schema
+        """
         self.sql_to_run = []
         self.rolename = common.check_name(rolename)
         logger.debug('self.rolename set to {}'.format(self.rolename))

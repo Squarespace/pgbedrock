@@ -139,20 +139,20 @@ def test_add_nonschema_ownerships(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema1': {
-                quoted_object('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
                 # This entry should be skipped because it is dependent
-                quoted_object('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
-                quoted_object('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
+                DBObject('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
+                DBObject('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
             },
             'schema2': {
                 # These all have the same owner, so it will become schema2.*
-                quoted_object('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
-                quoted_object('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
-                quoted_object('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
             },
             'owner3': {
                 # This entry should be skipped because it is in a personal schema
-                quoted_object('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
+                DBObject('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
         'sequences': {},
@@ -172,11 +172,8 @@ def test_add_nonschema_ownerships(mockdbcontext):
 
     actual = core_generate.add_nonschema_ownerships(spec, mockdbcontext, 'tables')
     assert actual['owner1']['owns']['schemas'] == ['schema1']
-    assert set(actual['owner1']['owns']['tables']) == set([
-        quoted_object('schema1', 'mytable1'),
-        'schema2.*',
-    ])
-    assert actual['owner2']['owns']['tables'] == [quoted_object('schema1', 'mytable3')]
+    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2."*"'])
+    assert actual['owner2']['owns']['tables'] == ['schema1."mytable3"']
     assert actual['owner3'] == {}
     assert actual['owner4'] == {}
 
@@ -210,30 +207,30 @@ def test_add_ownerships(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema1': {
-                quoted_object('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
                 # This entry should be skipped because it is dependent
-                quoted_object('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
-                quoted_object('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
+                DBObject('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
+                DBObject('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
             },
             'schema2': {
                 # These all have the same owner, so it will become schema2.*
-                quoted_object('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
-                quoted_object('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
-                quoted_object('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
             },
             'owner3': {
                 # This entry should be skipped because it is in a personal schema
-                quoted_object('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
+                DBObject('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
         'sequences': {
             'schema1': {
-                quoted_object('schema1', 'myseq1'): {'owner': 'owner2', 'is_dependent': False},
-                quoted_object('schema1', 'myseq2'): {'owner': 'owner3', 'is_dependent': True},
+                DBObject('schema1', 'myseq1'): {'owner': 'owner2', 'is_dependent': False},
+                DBObject('schema1', 'myseq2'): {'owner': 'owner3', 'is_dependent': True},
             },
             'schema2': {
-                quoted_object('schema2', 'myseq3'): {'owner': 'owner1', 'is_dependent': False},
-                quoted_object('schema2', 'myseq4'): {'owner': 'owner2', 'is_dependent': False},
+                DBObject('schema2', 'myseq3'): {'owner': 'owner1', 'is_dependent': False},
+                DBObject('schema2', 'myseq4'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
     }
@@ -259,18 +256,12 @@ def test_add_ownerships(mockdbcontext):
     assert actual['owner3'] == {'has_personal_schema': True}
 
     # Table ownership assertions
-    assert set(actual['owner1']['owns']['tables']) == set([
-        quoted_object('schema1', 'mytable1'),
-        'schema2.*',
-    ])
-    assert actual['owner2']['owns']['tables'] == [quoted_object('schema1', 'mytable3')]
+    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2."*"'])
+    assert actual['owner2']['owns']['tables'] == ['schema1."mytable3"']
 
     # Sequence ownership assertions
-    assert actual['owner1']['owns']['sequences'] == [quoted_object('schema2', 'myseq3')]
-    assert set(actual['owner2']['owns']['sequences']) == set([
-        'schema1.*',
-        quoted_object('schema2', 'myseq4')
-    ])
+    assert actual['owner1']['owns']['sequences'] == ['schema2."myseq3"']
+    assert set(actual['owner2']['owns']['sequences']) == set(['schema1."*"', 'schema2."myseq4"'])
 
 
 @run_setup_sql([
