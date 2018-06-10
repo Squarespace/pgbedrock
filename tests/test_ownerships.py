@@ -266,7 +266,7 @@ def test_nonschemaanalyzer_expand_schema_objects(mockdbcontext):
             },
         },
     }
-    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], objname=DUMMY,
+    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], dbobject=DUMMY,
                                 objkind='tables', dbcontext=mockdbcontext)
     actual = nsa.expand_schema_objects(SCHEMAS[0])
     expected = [DBObject(SCHEMAS[0], TABLES[0]), DBObject(SCHEMAS[0], TABLES[1])]
@@ -274,35 +274,33 @@ def test_nonschemaanalyzer_expand_schema_objects(mockdbcontext):
 
 
 def test_nonschemaanalyzer_analyze_no_changed_needed(mockdbcontext):
-    objname = quoted_object(SCHEMAS[0], TABLES[0])
-    dbo = DBObject(SCHEMAS[0], TABLES[0])
+    dbobject = DBObject(SCHEMAS[0], TABLES[0])
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                dbo: {'owner': ROLES[0], 'is_dependent': False},
+                dbobject: {'owner': ROLES[0], 'is_dependent': False},
             },
         },
     }
-    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], objname=objname,
+    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], dbobject=dbobject,
                                 objkind='tables', dbcontext=mockdbcontext)
     actual = nsa.analyze()
     assert actual == []
 
 
 def test_nonschemaanalyzer_analyze_without_schema_expansion(mockdbcontext):
-    objname = quoted_object(SCHEMAS[0], TABLES[0])
-    dbo = DBObject(SCHEMAS[0], TABLES[0])
+    dbobject = DBObject(SCHEMAS[0], TABLES[0])
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             SCHEMAS[0]: {
-                dbo: {'owner': ROLES[1], 'is_dependent': False},
+                dbobject: {'owner': ROLES[1], 'is_dependent': False},
             },
         },
     }
-    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], objname=objname,
+    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], dbobject=dbobject,
                                 objkind='tables', dbcontext=mockdbcontext)
     actual = nsa.analyze()
-    expected = [own.Q_SET_OBJECT_OWNER.format('TABLE', objname, ROLES[0], ROLES[1])]
+    expected = [own.Q_SET_OBJECT_OWNER.format('TABLE', dbobject.qualified_name, ROLES[0], ROLES[1])]
     assert actual == expected
 
 
@@ -319,7 +317,7 @@ def test_nonschemaanalyzer_analyze_with_schema_expansion(mockdbcontext):
             },
         },
     }
-    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], objname='{}.*'.format(SCHEMAS[0]),
+    nsa = own.NonschemaAnalyzer(rolename=ROLES[0], dbobject=DBObject(SCHEMAS[0], '*'),
                                 objkind='sequences', dbcontext=mockdbcontext)
     actual = nsa.analyze()
     expected = [

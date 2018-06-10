@@ -42,7 +42,8 @@ def analyze_ownerships(spec, cursor, verbose):
                         all_sql_to_run += sql_to_run
                 else:
                     for objname in objects_to_own:
-                        sql_to_run = NonschemaAnalyzer(rolename=rolename, objname=objname,
+                        dbobject = DBObject.from_str(objname)
+                        sql_to_run = NonschemaAnalyzer(rolename=rolename, dbobject=dbobject,
                                                        objkind=objkind, dbcontext=dbcontext).analyze()
                         all_sql_to_run += sql_to_run
 
@@ -57,9 +58,21 @@ class NonschemaAnalyzer(object):
     If the objname is schema.* then ownership for each of the objects (of kind objkind)
     in that schema will be verified and changed if necessary.
     """
-    def __init__(self, rolename, objname, objkind, dbcontext):
+    def __init__(self, rolename, dbobject, objkind, dbcontext):
+        """
+        Args:
+            rolename (str): The name of the role that should own the object(s)
+
+            dbobject (context.DBObject): The object(s) to analyze
+
+            objkind (str): The type of object. This must be one of the keys of
+                context.PRIVILEGE_MAP, e.g. 'schemas', 'tables', etc.
+
+            dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
+                information for the associated database
+        """
         self.rolename = rolename
-        self.objname = objname
+        self.dbobject = dbobject
         self.objkind = objkind
         self.dbcontext = dbcontext
         self.sql_to_run = []
@@ -72,16 +85,14 @@ class NonschemaAnalyzer(object):
         return nondependent_objects
 
     def analyze(self):
-        schema = self.objname.split('.')[0]
-
-        if self.objname.endswith('.*'):
-            objects_to_manage = self.expand_schema_objects(schema)
+        if self.dbobject.object_name == '*':
+            objects_to_manage = self.expand_schema_objects(self.dbobject.schema)
         else:
-            objects_to_manage = [DBObject.from_str(self.objname)]
+            objects_to_manage = [self.dbobject]
 
         all_object_attributes = self.dbcontext.get_all_object_attributes()
         for dbobject in objects_to_manage:
-            current_owner = all_object_attributes[self.objkind][schema][dbobject]['owner']
+            current_owner = all_object_attributes[self.objkind][self.dbobject.schema][dbobject]['owner']
             if current_owner != self.rolename:
                 obj_kind_singular = self.objkind.upper()[:-1]
                 query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, dbobject.qualified_name,
