@@ -240,23 +240,16 @@ def determine_schema_privileges(role, dbcontext):
     read privileges as well).
     """
     # Make a copy of personal_schemas (by making a new set from it) as we will be mutating it
-    #TODO: Remove this transformation
-    personal_schemas_dbo = set(dbcontext.get_all_personal_schemas())
-    personal_schemas = {dbo.qualified_name for dbo in personal_schemas_dbo}
+    personal_schemas = set(dbcontext.get_all_personal_schemas())
 
     # Get all schemas this role has write and read access to
-    write_schemas_and_owners = dbcontext.get_role_current_nondefaults(role, 'schemas', 'write')
-    read_schemas_and_owners = dbcontext.get_role_current_nondefaults(role,  'schemas', 'read')
-
-    # TODO: Use the DBObject instance instead of it's qualified_name
-    write_schemas = {s.qualified_name for s, _ in write_schemas_and_owners}
-    read_schemas = {s.qualified_name for s, _ in read_schemas_and_owners}
+    write_schemas_and_privs = dbcontext.get_role_current_nondefaults(role, 'schemas', 'write')
+    write_schemas = set([dbo for dbo, _ in write_schemas_and_privs])
+    read_schemas_and_privs = dbcontext.get_role_current_nondefaults(role, 'schemas', 'read')
+    read_schemas = set([dbo for dbo, _ in read_schemas_and_privs])
 
     # Get all schemas owned by this role
-    all_owned_schemas_raw = dbcontext.get_all_schemas_and_owners()
-    #TODO: Remove this transformation
-    all_owned_schemas = {dbobject.qualified_name: owner for dbobject, owner in all_owned_schemas_raw.items()}
-
+    all_owned_schemas = dbcontext.get_all_schemas_and_owners()
     role_owned_schemas = {s for s, owner in all_owned_schemas.items() if owner == role}
 
     # Add all schemas owned by this role to the write and read schemas
@@ -264,27 +257,27 @@ def determine_schema_privileges(role, dbcontext):
     read_schemas.update(role_owned_schemas)
 
     # Remove this role's personal schema if it exists
-    write_schemas.difference_update({role})
-    read_schemas.difference_update({role})
-    personal_schemas.difference_update({role})
+    write_schemas.difference_update({DBObject(role)})
+    read_schemas.difference_update({DBObject(role)})
+    personal_schemas.difference_update({DBObject(role)})
 
     # If all personal schemas are in write_schemas then replace them with 'personal_schemas'
     if personal_schemas and personal_schemas.difference(write_schemas) == set():
         write_schemas.difference_update(personal_schemas)
-        write_schemas.add('personal_schemas')
+        write_schemas.add(DBObject('personal_schemas'))
 
     if personal_schemas and personal_schemas.difference(read_schemas) == set():
         read_schemas.difference_update(personal_schemas)
-        read_schemas.add('personal_schemas')
+        read_schemas.add(DBObject('personal_schemas'))
 
     # Remove all schemas this role has write access to
     read_only_schemas = read_schemas.difference(write_schemas)
 
     schemas_privs = {}
     if write_schemas:
-        schemas_privs['write'] = sorted(write_schemas)
+        schemas_privs['write'] = sorted([dbo.qualified_name for dbo in write_schemas])
     if read_only_schemas:
-        schemas_privs['read'] = sorted(read_only_schemas)
+        schemas_privs['read'] = sorted([dbo.qualified_name for dbo in read_only_schemas])
 
     return schemas_privs
 
