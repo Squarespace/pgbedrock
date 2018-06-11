@@ -566,7 +566,8 @@ def test_determine_schema_privileges_has_personal_schema(cursor):
 def test_determine_nonschema_privileges_for_schema_no_objects_with_default_priv(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set()
     assert actr == set([DBObject(schema='schema0', object_name='*')])
 
@@ -582,7 +583,8 @@ def test_determine_nonschema_privileges_for_schema_no_objects_with_default_priv(
 def test_determine_nonschema_privileges_for_schema_no_objects(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set()
     assert actr == set()
 
@@ -604,7 +606,8 @@ def test_determine_nonschema_privileges_for_schema_no_objects(cursor):
 def test_determine_nonschema_privileges_for_schema_default_write(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
@@ -626,7 +629,8 @@ def test_determine_nonschema_privileges_for_schema_default_write(cursor):
 def test_determine_nonschema_privileges_for_schema_has_all_writes(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
@@ -650,7 +654,8 @@ def test_determine_nonschema_privileges_for_schema_has_all_writes(cursor):
 def test_determine_nonschema_privileges_for_schema_some_write_default_read(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([DBObject(schema='schema0', object_name='table0')])
     assert actr == set([DBObject(schema='schema0', object_name='*')])
 
@@ -672,7 +677,8 @@ def test_determine_nonschema_privileges_for_schema_some_write_default_read(curso
 def test_determine_nonschema_privileges_for_schema_no_writes_all_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set()
     assert actr == set([DBObject(schema='schema0', object_name='*')])
 
@@ -698,7 +704,8 @@ def test_determine_nonschema_privileges_for_schema_no_writes_all_reads(cursor):
 def test_determine_nonschema_privileges_for_schema_some_writes_some_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([
         DBObject(schema='schema0', object_name='table1'),
         DBObject(schema='schema0', object_name='table2'),
@@ -725,7 +732,8 @@ def test_determine_nonschema_privileges_for_schema_some_writes_some_reads(cursor
 def test_determine_nonschema_privileges_for_schema_all_writes(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
@@ -749,7 +757,8 @@ def test_determine_nonschema_privileges_for_schema_all_writes(cursor):
 def test_determine_nonschema_privileges_for_schema_default_write_some_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
@@ -769,7 +778,8 @@ def test_determine_nonschema_privileges_for_schema_default_write_some_reads(curs
 def test_determine_nonschema_privileges_for_schema_default_write_and_default_read(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set([DBObject(schema='schema0', object_name='*')])
     assert actr == set()
 
@@ -791,7 +801,8 @@ def test_determine_nonschema_privileges_for_schema_default_write_and_default_rea
 def test_determine_nonschema_privileges_for_schema_no_write_all_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set()
     assert actr == set([DBObject(schema='schema0', object_name='*')])
 
@@ -812,7 +823,8 @@ def test_determine_nonschema_privileges_for_schema_no_write_all_reads(cursor):
 def test_determine_nonschema_privileges_for_schema_no_writes_some_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set()
     assert actr == set([DBObject(schema='schema0', object_name='table0')])
 
@@ -832,7 +844,8 @@ def test_determine_nonschema_privileges_for_schema_no_writes_some_reads(cursor):
 def test_determine_nonschema_privileges_for_schema_no_objects_of_objkind(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         'schema0', dbcontext)
+                                                                         DBObject('schema0'),
+                                                                         dbcontext)
     assert actw == set()
     assert actr == set()
 

@@ -299,7 +299,7 @@ def determine_all_nonschema_privileges(role, objkind, dbcontext):
         if role == dbobject.schema and role == owner:
             continue
 
-        writes, reads = determine_nonschema_privileges_for_schema(role, objkind, dbobject.schema,
+        writes, reads = determine_nonschema_privileges_for_schema(role, objkind, dbobject,
                                                                   dbcontext)
 
         all_writes.update(writes)
@@ -308,11 +308,11 @@ def determine_all_nonschema_privileges(role, objkind, dbcontext):
     return all_writes, all_reads
 
 
-def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
+def determine_nonschema_privileges_for_schema(role, objkind, dbobject, dbcontext):
     """
     Determine all non-schema privileges granted to a given role for all objects of objkind in
-    the specified schema. Results will be returned as two sets: objects granted write access
-    and objects granted read access.
+    the specified schema `dbobject`. Results will be returned as two sets: objects granted write
+    access and objects granted read access.
 
     We explicitly start with writes because if a role has write access then pgbedrock will also
     grant it read access, meaning we won't need to grant that object a read. As a result, we have
@@ -333,34 +333,45 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
     means that this role will get _all_ write-level default privileges for that objkind in this
     schema.
 
+    Args:
+        role (str)
+
+        objkind (str): The type of object. This must be one of the keys of
+            context.PRIVILEGE_MAP, e.g. 'schemas', 'tables', etc.
+
+        dbobject (context.DBObject): The schema to determine non-schema privileges for
+
+        dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
+            information for the associated database
+
     Returns:
         tuple: A tuple of with two items in it: a set of DBObject instances with write privileges
             and a set of DBObject instances with read privileges
     """
     # Get all objects of this objkind in this schema and which are not owned by this role
-    objects_and_owners = dbcontext.get_schema_objects(schema)
+    objects_and_owners = dbcontext.get_schema_objects(dbobject.schema)
     schema_objects = set()
     for entry in objects_and_owners:
         if entry.kind == objkind and entry.owner != role:
             schema_objects.add(entry.dbobject)
 
-    has_default_write = dbcontext.has_default_privilege(role, schema, objkind, 'write')
-    all_writes = dbcontext.get_role_objects_with_access(role, schema, objkind, 'write')
+    has_default_write = dbcontext.has_default_privilege(role, dbobject.schema, objkind, 'write')
+    all_writes = dbcontext.get_role_objects_with_access(role, dbobject.schema, objkind, 'write')
 
     if has_default_write or (all_writes == schema_objects and all_writes != set()):
         # In the second condition, every object has a write privilege, so we assume that means
         # that this role should have default write privileges
-        return set([DBObject(schema=schema, object_name='*')]), set()
+        return set([DBObject(schema=dbobject.schema, object_name='*')]), set()
 
     # If we haven't returned yet then no write default privilege exists; we will have to
     # grant each write individually, meaning we also need to look at read privileges
-    has_default_read = dbcontext.has_default_privilege(role, schema, objkind, 'read')
-    all_reads = dbcontext.get_role_objects_with_access(role, schema, objkind, 'read')
+    has_default_read = dbcontext.has_default_privilege(role, dbobject.schema, objkind, 'read')
+    all_reads = dbcontext.get_role_objects_with_access(role, dbobject.schema, objkind, 'read')
 
     if has_default_read or (all_reads == schema_objects and all_reads != set()):
         # In the second condition, every object has a read privilege, so we assume that means
         # that this role should have default read privileges
-        return all_writes, set([DBObject(schema=schema, object_name='*')])
+        return all_writes, set([DBObject(schema=dbobject.schema, object_name='*')])
     else:
         # We have to grant each read individually as well. Because a write will already grant
         # a read, we have to remove all write-granted objects from our read grants
