@@ -255,7 +255,9 @@ class DBObject(object):
         self._schema = self._unquoted_item(schema)
         self._object_name = self._unquoted_item(object_name)
 
-        if self._object_name:
+        if self._object_name and self._object_name == '*':
+            self._qualified_name = '{}.{}'.format(self.schema, self.object_name)
+        elif self._object_name and self._object_name != '*':
             #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
             self._qualified_name = '{}."{}"'.format(self.schema, self.object_name)
         else:

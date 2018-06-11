@@ -172,7 +172,7 @@ def test_add_nonschema_ownerships(mockdbcontext):
 
     actual = core_generate.add_nonschema_ownerships(spec, mockdbcontext, 'tables')
     assert actual['owner1']['owns']['schemas'] == ['schema1']
-    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2."*"'])
+    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2.*'])
     assert actual['owner2']['owns']['tables'] == ['schema1."mytable3"']
     assert actual['owner3'] == {}
     assert actual['owner4'] == {}
@@ -256,12 +256,12 @@ def test_add_ownerships(mockdbcontext):
     assert actual['owner3'] == {'has_personal_schema': True}
 
     # Table ownership assertions
-    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2."*"'])
+    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2.*'])
     assert actual['owner2']['owns']['tables'] == ['schema1."mytable3"']
 
     # Sequence ownership assertions
     assert actual['owner1']['owns']['sequences'] == ['schema2."myseq3"']
-    assert set(actual['owner2']['owns']['sequences']) == set(['schema1."*"', 'schema2."myseq4"'])
+    assert set(actual['owner2']['owns']['sequences']) == set(['schema1.*', 'schema2."myseq4"'])
 
 
 @run_setup_sql([
@@ -404,7 +404,7 @@ def test_add_privileges(cursor):
                     'write': ['schema3'],
                 },
                 'tables': {
-                    'write': ['schema0."*"'],
+                    'write': ['schema0.*'],
                 },
             },
         },

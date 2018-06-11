@@ -61,7 +61,7 @@ def test_dbobject_from_str_only_schema(full_name):
     ('"foo"."bar"', 'foo', 'bar', 'foo."bar"'),
     ('"foo".bar.baz', 'foo', 'bar.baz', 'foo."bar.baz"'),
     ('"foo"."bar.baz"', 'foo', 'bar.baz', 'foo."bar.baz"'),
-    ('foo.*', 'foo', '*', 'foo."*"'),
+    ('foo.*', 'foo', '*', 'foo.*'),
 ])
 def test_objectname_from_str_schema_and_object(full_name, schema_name, object_name, qualified_name):
     myobj = context.DBObject.from_str(full_name)
