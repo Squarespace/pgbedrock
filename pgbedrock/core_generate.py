@@ -73,6 +73,9 @@ def add_schema_ownerships(spec, dbcontext):
     though, and ithe implication is that when `pgbedrock configure` is run, if there are any
     objects in that schema that are not owned by the schema owner they will have their ownership
     changed (to be the same as the schema owner).
+
+    Returns:
+        dict: The input spec with schema ownerships added
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     schemas_and_owners = dbcontext.get_all_schemas_and_owners()
@@ -88,7 +91,7 @@ def add_schema_ownerships(spec, dbcontext):
             elif 'schemas' not in spec[owner]['owns']:
                 spec[owner]['owns']['schemas'] = []
 
-            spec[owner]['owns']['schemas'].append(schema.qualified_name)
+            spec[owner]['owns']['schemas'].append(schema)
 
     return spec
 
@@ -101,6 +104,9 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
     Objects that are dependent on other objects are skipped as we cannot configure their ownership;
     their ownership is tied to the object they depend on. Additionally, objects in personal schemas
     are skipped as they are managed by ownerships.py as part of the personal schema ownership.
+
+    Returns:
+        dict: The input spec with nonschema ownerships added
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     all_objects_and_owners = dbcontext.get_all_object_attributes()
@@ -126,7 +132,7 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
                 spec[owner]['owns'][objkind] = []
 
             dbo = DBObject(schema=schema, object_name='*')
-            spec[owner]['owns'][objkind].append(dbo.qualified_name)
+            spec[owner]['owns'][objkind].append(dbo)
 
             # Since all objects in this schema are owned by one role, we can skip the below
             continue
@@ -142,7 +148,7 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
             elif objkind not in spec[owner]['owns']:
                 spec[owner]['owns'][objkind] = []
 
-            spec[owner]['owns'][objkind].append(dbo.qualified_name)
+            spec[owner]['owns'][objkind].append(dbo)
 
     return spec
 
@@ -165,17 +171,8 @@ def add_privileges(spec, dbcontext):
         for objkind in PRIVILEGE_MAP.keys():
             if objkind == 'schemas':
                 schemas_privs = determine_schema_privileges(role, dbcontext)
-
                 if schemas_privs:
-                    role_privileges['schemas'] = {}
-
-                # Render the schemas as strings and add them to the role's privilege dict
-                if 'write' in schemas_privs:
-                    rendered = sorted([dbo.qualified_name for dbo in schemas_privs['write']])
-                    role_privileges['schemas']['write'] = rendered
-                if 'read' in schemas_privs:
-                    rendered = sorted([dbo.qualified_name for dbo in schemas_privs['read']])
-                    role_privileges['schemas']['read'] = rendered
+                    role_privileges['schemas'] = schemas_privs
 
             else:
                 obj_privs = {}
@@ -183,13 +180,11 @@ def add_privileges(spec, dbcontext):
 
                 if writes:
                     collapsed_writes = collapse_personal_schemas(role, writes, objkind, dbcontext)
-                    sorted_writes = sorted([item.qualified_name for item in collapsed_writes])
-                    obj_privs['write'] = sorted_writes
+                    obj_privs['write'] = collapsed_writes
 
                 if reads:
                     collapsed_reads = collapse_personal_schemas(role, reads, objkind, dbcontext)
-                    sorted_reads = sorted([item.qualified_name for item in collapsed_reads])
-                    obj_privs['read'] = sorted_reads
+                    obj_privs['read'] = collapsed_reads
 
                 if obj_privs:
                     role_privileges[objkind] = obj_privs
@@ -212,7 +207,7 @@ def collapse_personal_schemas(role, objects, objkind, dbcontext):
     personal schema
 
     Returns:
-        set
+        set: A set of context.DBObject instances
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     personal_schemas_star = set([DBObject(schema=dbo.schema, object_name='*') for dbo in personal_schemas])
@@ -247,6 +242,10 @@ def determine_schema_privileges(role, dbcontext):
     this is confusing and non-intuitive, we will include schemas in the write section even if they
     are owned by this role (and because they are in the write section then they will also be granted
     read privileges as well).
+
+    Returns:
+        tuple: A tuple of (write privileges, read privileges), where each component in the tuple
+            is a set of context.DBObject instances
     """
     # Make a copy of personal_schemas (by making a new set from it) as we will be mutating it
     personal_schemas = set(dbcontext.get_all_personal_schemas())
@@ -443,7 +442,12 @@ def output_spec(spec):
             return dumper.represent_dict(data)
         return dumper.represent_scalar('tag:yaml.org,2002:null', '')
 
+    def represent_dbobject(dumper, data):
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data.qualified_name)
+        # return dumper.represent_scalar('!str', data.qualified_name)
+
     yaml.add_representer(dict, represent_dict)
+    yaml.add_representer(DBObject, represent_dbobject)
 
     print(yaml.dump(spec, Dumper=FormattedDumper, default_flow_style=False, indent=4))
 
@@ -472,7 +476,7 @@ def sort_sublists(data):
         for key, values in data.items():
             sorted_values = sort_sublists(values)
             data[key] = sorted_values
-    elif isinstance(data, list):
+    elif isinstance(data, (list, set)):
         data = sorted(data)
 
     return data

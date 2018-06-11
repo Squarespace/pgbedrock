@@ -130,9 +130,9 @@ def test_add_schema_ownerships(mockdbcontext):
     # so we have to convert the entries to a set to check equivalence
     assert actual['owner1']['can_login'] is True
     assert actual['owner1']['has_personal_schema'] is True
-    assert set(actual['owner1']['owns']['schemas']) == set(['schema1', 'schema2'])
+    assert set(actual['owner1']['owns']['schemas']) == set([DBObject('schema1'), DBObject('schema2')])
     assert 'has_personal_schema' not in actual['owner2']
-    assert set(actual['owner2']['owns']['schemas']) == set(['owner2', 'schema3'])
+    assert set(actual['owner2']['owns']['schemas']) == set([DBObject('owner2'), DBObject('schema3')])
 
 
 def test_add_nonschema_ownerships(mockdbcontext):
@@ -172,8 +172,9 @@ def test_add_nonschema_ownerships(mockdbcontext):
 
     actual = core_generate.add_nonschema_ownerships(spec, mockdbcontext, 'tables')
     assert actual['owner1']['owns']['schemas'] == ['schema1']
-    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2.*'])
-    assert actual['owner2']['owns']['tables'] == ['schema1."mytable3"']
+    assert set(actual['owner1']['owns']['tables']) == set([DBObject('schema1', 'mytable1'),
+                                                           DBObject('schema2', '*')])
+    assert actual['owner2']['owns']['tables'] == [DBObject('schema1', 'mytable3')]
     assert actual['owner3'] == {}
     assert actual['owner4'] == {}
 
@@ -252,16 +253,19 @@ def test_add_ownerships(mockdbcontext):
 
     actual = core_generate.add_ownerships(spec, mockdbcontext)
     # Schema ownership assertions
-    assert set(actual['owner1']['owns']['schemas']) == set(['schema1', 'schema2'])
+    assert set(actual['owner1']['owns']['schemas']) == set([DBObject('schema1'),
+                                                            DBObject('schema2')])
     assert actual['owner3'] == {'has_personal_schema': True}
 
     # Table ownership assertions
-    assert set(actual['owner1']['owns']['tables']) == set(['schema1."mytable1"', 'schema2.*'])
-    assert actual['owner2']['owns']['tables'] == ['schema1."mytable3"']
+    assert set(actual['owner1']['owns']['tables']) == set([DBObject('schema1', 'mytable1'),
+                                                           DBObject('schema2', '*')])
+    assert actual['owner2']['owns']['tables'] == [DBObject('schema1', 'mytable3')]
 
     # Sequence ownership assertions
-    assert actual['owner1']['owns']['sequences'] == ['schema2."myseq3"']
-    assert set(actual['owner2']['owns']['sequences']) == set(['schema1.*', 'schema2."myseq4"'])
+    assert actual['owner1']['owns']['sequences'] == [DBObject('schema2', 'myseq3')]
+    assert set(actual['owner2']['owns']['sequences']) == set([DBObject('schema1', '*'),
+                                                              DBObject('schema2', 'myseq4')])
 
 
 @run_setup_sql([
@@ -400,11 +404,11 @@ def test_add_privileges(cursor):
         'role0': {
             'privileges': {
                 'schemas': {
-                    'read': ['schema0'],
-                    'write': ['schema3'],
+                    'read': set([DBObject('schema0')]),
+                    'write': set([DBObject('schema3')]),
                 },
                 'tables': {
-                    'write': ['schema0.*'],
+                    'write': set([DBObject('schema0', '*')]),
                 },
             },
         },
@@ -959,12 +963,45 @@ def test_output_spec(capsys):
     assert out == expected
 
 
+def test_output_spec_renders_dbobjects(capsys):
+    spec = {
+        'roleA': {
+            'privileges': {
+                'schemas': [
+                    DBObject('foo'),
+                    DBObject('bar'),
+                ],
+                'tables': [
+                    DBObject('foo', '*'),
+                    DBObject('bar', 'baz'),
+                ],
+            },
+        },
+    }
+    expected = textwrap.dedent("""
+    roleA:
+        privileges:
+            schemas:
+                - foo
+                - bar
+            tables:
+                - foo.*
+                - bar."baz"
+
+    """)
+
+    core_generate.output_spec(spec)
+    out, err = capsys.readouterr()
+    assert out == expected
+
+
 @pytest.mark.parametrize("input_, expected", [
     ([3, 1, 5, 2], [1, 2, 3, 5]),
     (8, 8),
     ('some text', 'some text'),
     ({'a': 3, 'b': 'foo', 'c': []}, {'a': 3, 'b': 'foo', 'c': []}),
     ({'a': [0, 6, 1], 'b': {'c': [8, 3, 1]}}, {'a': [0, 1, 6], 'b': {'c': [1, 3, 8]}}),
+    (set([8, 3, 1]), [1, 3, 8]),
 ])
 def test_sort_sublists(input_, expected):
     assert core_generate.sort_sublists(input_) == expected
