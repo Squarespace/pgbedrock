@@ -165,8 +165,17 @@ def add_privileges(spec, dbcontext):
         for objkind in PRIVILEGE_MAP.keys():
             if objkind == 'schemas':
                 schemas_privs = determine_schema_privileges(role, dbcontext)
+
                 if schemas_privs:
-                    role_privileges['schemas'] = schemas_privs
+                    role_privileges['schemas'] = {}
+
+                # Render the schemas as strings and add them to the role's privilege dict
+                if 'write' in schemas_privs:
+                    rendered = sorted([dbo.qualified_name for dbo in schemas_privs['write']])
+                    role_privileges['schemas']['write'] = rendered
+                if 'read' in schemas_privs:
+                    rendered = sorted([dbo.qualified_name for dbo in schemas_privs['read']])
+                    role_privileges['schemas']['read'] = rendered
 
             else:
                 obj_privs = {}
@@ -275,9 +284,9 @@ def determine_schema_privileges(role, dbcontext):
 
     schemas_privs = {}
     if write_schemas:
-        schemas_privs['write'] = sorted([dbo.qualified_name for dbo in write_schemas])
+        schemas_privs['write'] = write_schemas
     if read_only_schemas:
-        schemas_privs['read'] = sorted([dbo.qualified_name for dbo in read_only_schemas])
+        schemas_privs['read'] = read_only_schemas
 
     return schemas_privs
 

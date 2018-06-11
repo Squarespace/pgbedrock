@@ -439,8 +439,8 @@ def test_determine_schema_privileges_both_read_and_write_no_personal_schemas(cur
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'write': ['schema2', 'schema3'],
-        'read': ['schema0', 'schema1'],
+        'write': set([DBObject('schema2'), DBObject('schema3')]),
+        'read': set([DBObject('schema0'), DBObject('schema1')]),
     }
     assert actual == expected
 
@@ -470,7 +470,7 @@ def test_determine_schema_privileges_only_read_exists(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'read': ['schema0'],
+        'read': set([DBObject('schema0')]),
     }
     assert actual == expected
 
@@ -510,8 +510,8 @@ def test_determine_schema_privileges_personal_schemas(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'write': ['schema1'],
-        'read': ['personal_schemas', 'schema0'],
+        'write': set([DBObject('schema1')]),
+        'read': set([DBObject('personal_schemas'), DBObject('schema0')]),
     }
     assert actual == expected
 
@@ -533,7 +533,7 @@ def test_determine_schema_privileges_only_write_exists(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'write': ['schema0', 'schema1'],
+        'write': set([DBObject('schema0'), DBObject('schema1')]),
     }
     assert actual == expected
 
