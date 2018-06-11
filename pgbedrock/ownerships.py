@@ -129,7 +129,7 @@ class SchemaAnalyzer(object):
         self.dbobject = dbobject
         self.is_personal_schema = is_personal_schema
 
-        self.current_owner = dbcontext.get_schema_owner(self.dbobject.schema)
+        self.current_owner = dbcontext.get_schema_owner(self.dbobject)
         self.schema_objects = dbcontext.get_schema_objects(self.dbobject.schema)
         # If there is no owner then the schema must not exist yet
         self.exists = self.current_owner is not None

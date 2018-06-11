@@ -298,7 +298,7 @@ def ensure_no_unowned_schemas(spec, dbcontext):
     better to throw an error and ask the user to manually resolve this
     """
     current_schemas_and_owners = dbcontext.get_all_schemas_and_owners()
-    current_schemas = set(current_schemas_and_owners.keys())
+    current_schemas = set(dbobject.qualified_name for dbobject in current_schemas_and_owners.keys())
     spec_schemas = get_spec_schemas(spec)
     undocumented_schemas = current_schemas.difference(spec_schemas)
     if undocumented_schemas:

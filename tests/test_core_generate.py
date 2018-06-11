@@ -107,15 +107,15 @@ def test_add_memberships(mockdbcontext):
 def test_add_schema_ownerships(mockdbcontext):
     mockdbcontext.get_all_schemas_and_owners = lambda: {
         # Non-personal schemas
-        'schema1': 'owner1',
-        'schema2': 'owner1',
-        'schema3': 'owner2',
+        DBObject('schema1'): 'owner1',
+        DBObject('schema2'): 'owner1',
+        DBObject('schema3'): 'owner2',
 
         # Personal schema
-        'owner1': 'owner1',
+        DBObject('owner1'): 'owner1',
 
         # Would not show up in get_all_personal_schemas as can_login is False
-        'owner2': 'owner2',
+        DBObject('owner2'): 'owner2',
     }
     mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner1')])
 
@@ -236,11 +236,11 @@ def test_add_ownerships(mockdbcontext):
     }
     mockdbcontext.get_all_schemas_and_owners = lambda: {
         # Non-personal schemas
-        'schema1': 'owner1',
-        'schema2': 'owner1',
+        DBObject('schema1'): 'owner1',
+        DBObject('schema2'): 'owner1',
 
         # Personal schema
-        'owner3': 'owner3',
+        DBObject('owner3'): 'owner3',
     }
     mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner3')])
 

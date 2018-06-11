@@ -555,15 +555,26 @@ class DatabaseContext(object):
         return self.cursor.fetchall()
 
     def get_all_schemas_and_owners(self):
-        """ Return a dict of {schema_name: schema_owner} """
+        """
+        Returns:
+            dict: a dict of {schema_name: schema_owner}, where schema_name is a context.DBObject
+        """
         all_object_owners = self.get_all_object_attributes()
         schemas_subdict = all_object_owners.get('schemas', {})
         schema_owners = dict()
         for schema, attributes in schemas_subdict.items():
-            schema_owners[schema] = attributes[DBObject(schema)]['owner']
+            dbobject = DBObject(schema)
+            schema_owners[dbobject] = attributes[dbobject]['owner']
         return schema_owners
 
     def get_schema_owner(self, schema):
+        """
+        Args:
+            schema (DBObject): The schema to find the owner for
+
+        Returns:
+            str
+        """
         all_schemas_and_owners = self.get_all_schemas_and_owners()
         return all_schemas_and_owners.get(schema)
 

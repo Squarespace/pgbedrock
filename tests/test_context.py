@@ -442,14 +442,14 @@ def test_is_superuser(all_role_attributes, expected):
 def test_get_all_schemas_and_owners(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     expected = {
-        SCHEMAS[0]: ROLES[0],
-        SCHEMAS[1]: ROLES[0],
-        SCHEMAS[2]: ROLES[1],
-        ROLES[1]: ROLES[1],
+        context.DBObject(SCHEMAS[0]): ROLES[0],
+        context.DBObject(SCHEMAS[1]): ROLES[0],
+        context.DBObject(SCHEMAS[2]): ROLES[1],
+        context.DBObject(ROLES[1]): ROLES[1],
         # These already existed
-        'public': 'postgres',
-        'information_schema': 'postgres',
-        'pg_catalog': 'postgres',
+        context.DBObject('public'): 'postgres',
+        context.DBObject('information_schema'): 'postgres',
+        context.DBObject('pg_catalog'): 'postgres',
     }
 
     actual = dbcontext.get_all_schemas_and_owners()
@@ -496,7 +496,7 @@ def test_get_all_memberships(cursor):
 
 
 def test_get_schema_owner():
-    schema = 'foo'
+    schema = context.DBObject('foo')
     expected_owner = 'bar'
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=True)
     dbcontext._cache['get_all_schemas_and_owners'] = lambda: {schema: expected_owner}

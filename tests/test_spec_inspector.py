@@ -477,7 +477,9 @@ def test_ensure_no_undocumented_roles(mockdbcontext):
 
 
 def test_ensure_no_unowned_schemas(mockdbcontext):
-    mockdbcontext.get_all_schemas_and_owners = lambda: {'foo': {}, 'bar': {}, 'baz': {}}
+    mockdbcontext.get_all_schemas_and_owners = lambda: {
+        DBObject('foo'): {}, DBObject('bar'): {}, DBObject('baz'): {}
+    }
     spec = {
         'qux': {
             'owns': {

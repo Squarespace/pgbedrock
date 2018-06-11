@@ -74,10 +74,7 @@ def add_schema_ownerships(spec, dbcontext):
     objects in that schema that are not owned by the schema owner they will have their ownership
     changed (to be the same as the schema owner).
     """
-    personal_schemas_raw = dbcontext.get_all_personal_schemas()
-    #TODO: Remove this transformation
-    personal_schemas = set([schema.qualified_name for schema in personal_schemas_raw])
-
+    personal_schemas = dbcontext.get_all_personal_schemas()
     schemas_and_owners = dbcontext.get_all_schemas_and_owners()
 
     for schema, owner in schemas_and_owners.items():
@@ -91,7 +88,7 @@ def add_schema_ownerships(spec, dbcontext):
             elif 'schemas' not in spec[owner]['owns']:
                 spec[owner]['owns']['schemas'] = []
 
-            spec[owner]['owns']['schemas'].append(schema)
+            spec[owner]['owns']['schemas'].append(schema.qualified_name)
 
     return spec
 
@@ -256,7 +253,10 @@ def determine_schema_privileges(role, dbcontext):
     read_schemas = {s.qualified_name for s, _ in read_schemas_and_owners}
 
     # Get all schemas owned by this role
-    all_owned_schemas = dbcontext.get_all_schemas_and_owners()
+    all_owned_schemas_raw = dbcontext.get_all_schemas_and_owners()
+    #TODO: Remove this transformation
+    all_owned_schemas = {dbobject.qualified_name: owner for dbobject, owner in all_owned_schemas_raw.items()}
+
     role_owned_schemas = {s for s, owner in all_owned_schemas.items() if owner == role}
 
     # Add all schemas owned by this role to the write and read schemas
@@ -293,13 +293,14 @@ def determine_all_nonschema_privileges(role, objkind, dbcontext):
     all_writes = set()
     all_reads = set()
 
-    for schema, owner in dbcontext.get_all_schemas_and_owners().items():
+    for dbobject, owner in dbcontext.get_all_schemas_and_owners().items():
         # Skip this role's personal schema as we will be asserting upon running
         # pgbedrock that all objects in this schema are owned by this role
-        if role == schema and role == owner:
+        if role == dbobject.schema and role == owner:
             continue
 
-        writes, reads = determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext)
+        writes, reads = determine_nonschema_privileges_for_schema(role, objkind, dbobject.schema,
+                                                                  dbcontext)
 
         all_writes.update(writes)
         all_reads.update(reads)
