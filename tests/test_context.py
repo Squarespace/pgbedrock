@@ -45,6 +45,26 @@ def test_dbobject_equivalence():
     assert myobj1 == myobj2
 
 
+def test_dbobject_sorting():
+    list_of_dbobjects = [
+        context.DBObject(schema='baz'),
+        context.DBObject(schema='foo', object_name='gamma'),
+        context.DBObject(schema='foo', object_name='alpha'),
+        context.DBObject(schema='foo', object_name='bravo'),
+        context.DBObject(schema='bar'),
+    ]
+    expected = [
+        context.DBObject(schema='bar'),
+        context.DBObject(schema='baz'),
+        context.DBObject(schema='foo', object_name='alpha'),
+        context.DBObject(schema='foo', object_name='bravo'),
+        context.DBObject(schema='foo', object_name='gamma'),
+    ]
+
+    actual = sorted(list_of_dbobjects)
+    assert actual == expected
+
+
 @pytest.mark.parametrize('full_name', [('foo'), ('"foo"')])
 def test_dbobject_from_str_only_schema(full_name):
     myobj = context.DBObject.from_str(full_name)

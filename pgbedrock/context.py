@@ -269,6 +269,9 @@ class DBObject(object):
     def __hash__(self):
         return hash(self.qualified_name)
 
+    def __lt__(self, other):
+        return self.qualified_name < other.qualified_name
+
     @classmethod
     def from_str(cls, text):
         """ Convert a text representation of a qualified object name into an DBObject instance
