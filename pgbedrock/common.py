@@ -98,22 +98,22 @@ class ObjectName(object):
         * Be sure that when we get the fully-qualified name it will be double quoted
             properly, i.e.  "myschema"."mytable"
     """
-    def __init__(self, schema, object_name=None):
+    def __init__(self, schema, unqualified_name=None):
         # Make sure schema and table are both stored without double quotes around
         # them; we add these when ObjectName.qualified_name is called
         self._schema = self._unquoted_item(schema)
-        self._object_name = self._unquoted_item(object_name)
+        self._unqualified_name = self._unquoted_item(unqualified_name)
 
-        if self._object_name and self._object_name == '*':
-            self._qualified_name = '{}.{}'.format(self.schema, self.object_name)
-        elif self._object_name and self._object_name != '*':
+        if self._unqualified_name and self._unqualified_name == '*':
+            self._qualified_name = '{}.{}'.format(self.schema, self.unqualified_name)
+        elif self._unqualified_name and self._unqualified_name != '*':
             #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
-            self._qualified_name = '{}."{}"'.format(self.schema, self.object_name)
+            self._qualified_name = '{}."{}"'.format(self.schema, self.unqualified_name)
         else:
             self._qualified_name = '{}'.format(self.schema)
 
     def __eq__(self, other):
-        return (self.schema == other.schema) and (self.object_name == other.object_name)
+        return (self.schema == other.schema) and (self.unqualified_name == other.unqualified_name)
 
     def __hash__(self):
         return hash(self.qualified_name)
@@ -140,17 +140,17 @@ class ObjectName(object):
 
         # If there are multiple periods we assume that the first one delineates the schema from
         # the rest of the object, i.e. foo.bar.baz means schema foo and object "bar.baz"
-        schema, object_name = text.split('.', 1)
+        schema, unqualified_name = text.split('.', 1)
         # Don't worry about removing double quotes as that happens in __init__
-        return cls(schema=schema, object_name=object_name)
+        return cls(schema=schema, unqualified_name=unqualified_name)
 
     @property
     def schema(self):
         return self._schema
 
     @property
-    def object_name(self):
-        return self._object_name
+    def unqualified_name(self):
+        return self._unqualified_name
 
     @property
     def qualified_name(self):

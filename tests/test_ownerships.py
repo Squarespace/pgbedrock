@@ -190,10 +190,10 @@ def test_schemaanalyzer_existing_personal_schema_change_object_owners(mockdbcont
     personal_schema = ROLES[0]
     mockdbcontext.get_schema_owner = lambda x: ROLES[0]
     mockdbcontext.get_schema_objects = lambda x: [
-        ObjectInfo('tables', ObjectName(schema=personal_schema, object_name=TABLES[0]), ROLES[0], False),
-        ObjectInfo('sequences', ObjectName(schema=personal_schema, object_name=SEQUENCES[0]), ROLES[0], False),
-        ObjectInfo('tables', ObjectName(schema=personal_schema, object_name=TABLES[1]), ROLES[1], False),
-        ObjectInfo('sequences', ObjectName(schema=personal_schema, object_name=SEQUENCES[1]), ROLES[1], False),
+        ObjectInfo('tables', ObjectName(personal_schema, TABLES[0]), ROLES[0], False),
+        ObjectInfo('sequences', ObjectName(personal_schema, SEQUENCES[0]), ROLES[0], False),
+        ObjectInfo('tables', ObjectName(personal_schema, TABLES[1]), ROLES[1], False),
+        ObjectInfo('sequences', ObjectName(personal_schema, SEQUENCES[1]), ROLES[1], False),
     ]
     schemaconf = own.SchemaAnalyzer(ROLES[0], objname=ObjectName(personal_schema),
                                     dbcontext=mockdbcontext, is_personal_schema=True)
@@ -226,7 +226,7 @@ def test_schemaanalyzer_alter_object_owner(mockdbcontext):
     previous_owner = ROLES[1]
     owner = ROLES[0]
     schema = SCHEMAS[0]
-    objname = ObjectName(schema=schema, object_name=TABLES[0])
+    objname = ObjectName(schema, TABLES[0])
     mockdbcontext.get_schema_owner = lambda x: owner
 
     schemaconf = own.SchemaAnalyzer(owner, objname=ObjectName(schema), dbcontext=mockdbcontext)
@@ -242,22 +242,22 @@ def test_schemaanalyzer_get_improperly_owned_objects(mockdbcontext):
     mockdbcontext.get_schema_owner = lambda x: owner
     mockdbcontext.get_schema_objects = lambda x: [
         # Properly owned
-        ObjectInfo('tables', ObjectName(schema=owner, object_name=TABLES[0]), owner, False),
-        ObjectInfo('sequences', ObjectName(schema=owner, object_name=SEQUENCES[0]), owner, False),
+        ObjectInfo('tables', ObjectName(owner, TABLES[0]), owner, False),
+        ObjectInfo('sequences', ObjectName(owner, SEQUENCES[0]), owner, False),
 
         # Improperly owned
-        ObjectInfo('tables', ObjectName(schema=owner, object_name=TABLES[1]), wrong_owner, False),
-        ObjectInfo('sequences', ObjectName(schema=owner, object_name=SEQUENCES[1]), wrong_owner, False),
+        ObjectInfo('tables', ObjectName(owner, TABLES[1]), wrong_owner, False),
+        ObjectInfo('sequences', ObjectName(owner, SEQUENCES[1]), wrong_owner, False),
 
         # Improperly owned but dependent (i.e. should be skipped)
-        ObjectInfo('sequences', ObjectName(schema=owner, object_name=SEQUENCES[2]), wrong_owner, True),
+        ObjectInfo('sequences', ObjectName(owner, SEQUENCES[2]), wrong_owner, True),
     ]
     schemaconf = own.SchemaAnalyzer(rolename=owner, objname=ObjectName(owner),
                                     dbcontext=mockdbcontext, is_personal_schema=True)
 
     actual = schemaconf.get_improperly_owned_objects()
-    expected = [('tables', ObjectName(schema=owner, object_name=TABLES[1]), wrong_owner),
-                ('sequences', ObjectName(schema=owner, object_name=SEQUENCES[1]), wrong_owner)]
+    expected = [('tables', ObjectName(owner, TABLES[1]), wrong_owner),
+                ('sequences', ObjectName(owner, SEQUENCES[1]), wrong_owner)]
     assert set(actual) == set(expected)
 
 

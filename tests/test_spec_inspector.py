@@ -156,8 +156,8 @@ def test_ensure_no_object_owned_twice_personal_schemas_expanded(mockdbcontext):
 
 def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table1'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table3'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table1'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table3'), 'owner3', False),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
@@ -186,10 +186,10 @@ def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
 
 def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table1'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table2'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table3'), 'owner3', False),
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table4'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table1'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table2'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table3'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table4'), 'owner3', False),
         # This should be skipped as it is dependent
         ObjectAttributes('tables', 'schema0', 'schema0."table5"', 'owner3', True),
     }
@@ -221,8 +221,8 @@ def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
 
 def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'role0', ObjectName(schema='role0', object_name='table1'), 'role0', False),
-        ObjectAttributes('tables', 'role0', ObjectName(schema='role0', object_name='table2'), 'role0', False),
+        ObjectAttributes('tables', 'role0', ObjectName('role0', 'table1'), 'role0', False),
+        ObjectAttributes('tables', 'role0', ObjectName('role0', 'table2'), 'role0', False),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
@@ -243,8 +243,8 @@ def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
 
 def test_ensure_no_missing_objects_schema_expansion_works(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table1'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table2'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table1'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName('schema0', 'table2'), 'owner3', False),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {

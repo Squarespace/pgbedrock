@@ -104,7 +104,7 @@ def ensure_no_object_owned_twice(spec, dbcontext, objkind):
         role_owned_objects = config['owns'][objkind]
         for objname_as_str in role_owned_objects:
             objname = common.ObjectName.from_str(objname_as_str)
-            if objname.object_name == '*':
+            if objname.unqualified_name == '*':
                 schema_objects = all_db_objects.get(objname.schema, dict())
                 nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
                 for obj in nondependent_objects:
@@ -262,7 +262,7 @@ def ensure_no_missing_objects(spec, dbcontext, objkind):
         role_owned_objects = config['owns'][objkind]
         for objname_as_str in role_owned_objects:
             objname = common.ObjectName.from_str(objname_as_str)
-            if objname.object_name == '*':
+            if objname.unqualified_name == '*':
                 schema_objects = db_objects_by_schema.get(objname.schema, dict())
                 nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
                 for obj in nondependent_objects:
@@ -318,7 +318,7 @@ def ensure_no_dependent_object_is_owned(spec, dbcontext, objkind):
         role_owned_objects = config['owns'][objkind]
         for objname_as_str in role_owned_objects:
             objname = common.ObjectName.from_str(objname_as_str)
-            if objname.object_name == '*':
+            if objname.unqualified_name == '*':
                 continue
 
             try:

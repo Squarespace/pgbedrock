@@ -647,8 +647,8 @@ def test_analyze_nondefaults(mockdbcontext):
         - schema1.table3 (owned by role3) - GRANTED           --> REVOKE
     """
     mockdbcontext.get_role_current_nondefaults = lambda x, y, z: set([
-        (ObjectName(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
-        (ObjectName(schema=SCHEMAS[1], object_name=TABLES[3]), 'SELECT'),
+        (ObjectName(SCHEMAS[0], TABLES[1]), 'SELECT'),
+        (ObjectName(SCHEMAS[1], TABLES[3]), 'SELECT'),
     ])
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {

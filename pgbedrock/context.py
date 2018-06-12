@@ -393,7 +393,7 @@ class DatabaseContext(object):
                     'write': set(),
                 }
 
-            objname = common.ObjectName(schema=row.schema, object_name=row.unqualified_name)
+            objname = common.ObjectName(schema=row.schema, unqualified_name=row.unqualified_name)
             entry = (objname, row.privilege)
             role_nondefaults[row.objkind][access_key].add(entry)
 
@@ -439,7 +439,7 @@ class DatabaseContext(object):
         NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'unqualified_name', 'owner', 'is_dependent'])
         for i in self.cursor.fetchall():
             row = NamedRow(*i)
-            objname = common.ObjectName(schema=row.schema, object_name=row.unqualified_name)
+            objname = common.ObjectName(schema=row.schema, unqualified_name=row.unqualified_name)
             entry = ObjectAttributes(row.kind, row.schema, objname, row.owner, row.is_dependent)
             results.append(entry)
         return results

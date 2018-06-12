@@ -131,7 +131,7 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
             elif objkind not in spec[owner]['owns']:
                 spec[owner]['owns'][objkind] = []
 
-            objname = common.ObjectName(schema=schema, object_name='*')
+            objname = common.ObjectName(schema=schema, unqualified_name='*')
             spec[owner]['owns'][objkind].append(objname)
 
             # Since all objects in this schema are owned by one role, we can skip the below
@@ -211,7 +211,7 @@ def collapse_personal_schemas(role, objects, objkind, dbcontext):
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     personal_schemas_star = set([
-        common.ObjectName(schema=objname.schema, object_name='*') for objname in personal_schemas
+        common.ObjectName(schema=objname.schema, unqualified_name='*') for objname in personal_schemas
     ])
 
     if not personal_schemas_star:
@@ -220,11 +220,11 @@ def collapse_personal_schemas(role, objects, objkind, dbcontext):
     non_empty_personal_schemas = set()
     for objname in personal_schemas:
         if objname.schema != role and not dbcontext.is_schema_empty(objname.schema, objkind):
-            non_empty_personal_schemas.add(common.ObjectName(schema=objname.schema, object_name='*'))
+            non_empty_personal_schemas.add(common.ObjectName(schema=objname.schema, unqualified_name='*'))
 
     if non_empty_personal_schemas.difference(objects) == set():
         objects.difference_update(personal_schemas_star)
-        objects.add(common.ObjectName(schema='personal_schemas', object_name='*'))
+        objects.add(common.ObjectName(schema='personal_schemas', unqualified_name='*'))
 
     return objects
 
@@ -364,7 +364,7 @@ def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext)
     if has_default_write or (all_writes == schema_objects and all_writes != set()):
         # In the second condition, every object has a write privilege, so we assume that means
         # that this role should have default write privileges
-        return set([common.ObjectName(schema=objname.schema, object_name='*')]), set()
+        return set([common.ObjectName(schema=objname.schema, unqualified_name='*')]), set()
 
     # If we haven't returned yet then no write default privilege exists; we will have to
     # grant each write individually, meaning we also need to look at read privileges
@@ -374,7 +374,7 @@ def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext)
     if has_default_read or (all_reads == schema_objects and all_reads != set()):
         # In the second condition, every object has a read privilege, so we assume that means
         # that this role should have default read privileges
-        return all_writes, set([common.ObjectName(schema=objname.schema, object_name='*')])
+        return all_writes, set([common.ObjectName(schema=objname.schema, unqualified_name='*')])
     else:
         # We have to grant each read individually as well. Because a write will already grant
         # a read, we have to remove all write-granted objects from our read grants

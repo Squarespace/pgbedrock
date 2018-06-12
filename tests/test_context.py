@@ -134,8 +134,8 @@ def test_get_all_current_nondefaults(cursor):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
-                    (common.ObjectName(schema=SCHEMAS[1], object_name=TABLES[3]), 'SELECT'),
+                    (common.ObjectName(SCHEMAS[0], TABLES[1]), 'SELECT'),
+                    (common.ObjectName(SCHEMAS[1], TABLES[3]), 'SELECT'),
                 ]),
                 'write': set(),
             }
@@ -172,9 +172,9 @@ def test_get_all_current_nondefaults(cursor):
 
 @pytest.mark.parametrize('rolename, object_kind, access, expected', [
     ('role1', 'object_kind1', 'access1', set([
-        (common.ObjectName(schema='foo', object_name='bar'), 'SELECT'),
-        (common.ObjectName(schema='foo', object_name='baz'), 'SELECT'),
-        (common.ObjectName(schema='foo', object_name='qux'), 'INSERT'),
+        (common.ObjectName('foo', 'bar'), 'SELECT'),
+        (common.ObjectName('foo', 'baz'), 'SELECT'),
+        (common.ObjectName('foo', 'qux'), 'INSERT'),
     ])),
     ('role1', 'object_kind1', 'missing_access', set()),
     ('role1', 'missing_object_kind1', 'access1', set()),
@@ -186,9 +186,9 @@ def test_get_role_current_nondefaults(rolename, object_kind, access, expected):
         'role1': {
             'object_kind1': {
                 'access1': set([
-                    (common.ObjectName(schema='foo', object_name='bar'), 'SELECT'),
-                    (common.ObjectName(schema='foo', object_name='baz'), 'SELECT'),
-                    (common.ObjectName(schema='foo', object_name='qux'), 'INSERT'),
+                    (common.ObjectName('foo', 'bar'), 'SELECT'),
+                    (common.ObjectName('foo', 'baz'), 'SELECT'),
+                    (common.ObjectName('foo', 'qux'), 'INSERT'),
                 ])
             }
         }
@@ -202,8 +202,8 @@ def test_get_role_current_nondefaults(rolename, object_kind, access, expected):
 @pytest.mark.parametrize('access, expected', [
     ('write', set()),
     ('read', set([
-        common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[0]),
-        common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[1])
+        common.ObjectName(SCHEMAS[0], TABLES[0]),
+        common.ObjectName(SCHEMAS[0], TABLES[1])
     ])),
 ])
 def test_get_role_objects_with_access(access, expected):
@@ -212,8 +212,8 @@ def test_get_role_objects_with_access(access, expected):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[0]), 'SELECT'),
-                    (common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
+                    (common.ObjectName(SCHEMAS[0], TABLES[0]), 'SELECT'),
+                    (common.ObjectName(SCHEMAS[0], TABLES[1]), 'SELECT'),
                 ])
             }
         }
@@ -468,13 +468,13 @@ def test_get_all_nonschema_objects_and_owners(cursor):
     expected = {
         SCHEMAS[0]:
         [
-            context.ObjectInfo('tables', common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[0]), ROLES[0], False),
-            context.ObjectInfo('sequences', common.ObjectName(schema=SCHEMAS[0], object_name=SEQUENCES[1]), ROLES[0], False),
+            context.ObjectInfo('tables', common.ObjectName(SCHEMAS[0], TABLES[0]), ROLES[0], False),
+            context.ObjectInfo('sequences', common.ObjectName(SCHEMAS[0], SEQUENCES[1]), ROLES[0], False),
         ],
         SCHEMAS[1]:
         [
-            context.ObjectInfo('tables', common.ObjectName(schema=SCHEMAS[1], object_name=TABLES[0]), ROLES[1], False),
-            context.ObjectInfo('sequences', common.ObjectName(schema=SCHEMAS[1], object_name=SEQUENCES[2]), ROLES[1], False),
+            context.ObjectInfo('tables', common.ObjectName(SCHEMAS[1], TABLES[0]), ROLES[1], False),
+            context.ObjectInfo('sequences', common.ObjectName(SCHEMAS[1], SEQUENCES[2]), ROLES[1], False),
         ],
     }
     actual = dbcontext.get_all_nonschema_objects_and_owners()

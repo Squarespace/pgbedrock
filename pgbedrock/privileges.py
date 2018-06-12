@@ -254,7 +254,7 @@ class PrivilegeAnalyzer(object):
             objname_as_str = item.split('.', 1)[1]
         else:
             objname_as_str = None
-        objname = common.ObjectName(schema=schema, object_name=objname_as_str)
+        objname = common.ObjectName(schema=schema, unqualified_name=objname_as_str)
         object_owners = self.all_object_attrs.get(objkind, dict()).get(schema, dict())
         owner = object_owners.get(objname, dict()).get('owner', None)
         if owner:

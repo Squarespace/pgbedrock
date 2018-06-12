@@ -87,7 +87,7 @@ class NonschemaAnalyzer(object):
         return nondependent_objects
 
     def analyze(self):
-        if self.objname.object_name == '*':
+        if self.objname.unqualified_name == '*':
             objects_to_manage = self.expand_schema_objects(self.objname.schema)
         else:
             objects_to_manage = [self.objname]

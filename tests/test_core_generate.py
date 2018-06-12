@@ -574,7 +574,7 @@ def test_determine_nonschema_privileges_for_schema_no_objects_with_default_priv(
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([ObjectName(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName('schema0', '*')])
 
 
 @run_setup_sql([
@@ -613,7 +613,7 @@ def test_determine_nonschema_privileges_for_schema_default_write(cursor):
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName('schema0', '*')])
     assert actr == set()
 
 
@@ -636,7 +636,7 @@ def test_determine_nonschema_privileges_for_schema_has_all_writes(cursor):
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName('schema0', '*')])
     assert actr == set()
 
 
@@ -661,8 +661,8 @@ def test_determine_nonschema_privileges_for_schema_some_write_default_read(curso
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='table0')])
-    assert actr == set([ObjectName(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName('schema0', 'table0')])
+    assert actr == set([ObjectName('schema0', '*')])
 
 
 @run_setup_sql([
@@ -685,7 +685,7 @@ def test_determine_nonschema_privileges_for_schema_no_writes_all_reads(cursor):
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([ObjectName(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName('schema0', '*')])
 
 
 @run_setup_sql([
@@ -712,10 +712,10 @@ def test_determine_nonschema_privileges_for_schema_some_writes_some_reads(cursor
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set([
-        ObjectName(schema='schema0', object_name='table1'),
-        ObjectName(schema='schema0', object_name='table2'),
+        ObjectName('schema0', 'table1'),
+        ObjectName('schema0', 'table2'),
     ])
-    assert actr == set([ObjectName(schema='schema0', object_name='table0')])
+    assert actr == set([ObjectName('schema0', 'table0')])
 
 
 @run_setup_sql([
@@ -739,7 +739,7 @@ def test_determine_nonschema_privileges_for_schema_all_writes(cursor):
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName('schema0', '*')])
     assert actr == set()
 
 
@@ -764,7 +764,7 @@ def test_determine_nonschema_privileges_for_schema_default_write_some_reads(curs
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName('schema0', '*')])
     assert actr == set()
 
 
@@ -785,7 +785,7 @@ def test_determine_nonschema_privileges_for_schema_default_write_and_default_rea
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName('schema0', '*')])
     assert actr == set()
 
 
@@ -809,7 +809,7 @@ def test_determine_nonschema_privileges_for_schema_no_write_all_reads(cursor):
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([ObjectName(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName('schema0', '*')])
 
 
 @run_setup_sql([
@@ -831,7 +831,7 @@ def test_determine_nonschema_privileges_for_schema_no_writes_some_reads(cursor):
                                                                          ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([ObjectName(schema='schema0', object_name='table0')])
+    assert actr == set([ObjectName('schema0', 'table0')])
 
 
 @run_setup_sql([
@@ -884,8 +884,8 @@ def test_determine_nonschema_privileges_for_schema_no_objects_of_objkind(cursor)
 def test_determine_all_nonschema_privileges(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_all_nonschema_privileges('role0', 'tables', dbcontext)
-    assert actw == set([ObjectName(schema='schema0', object_name='*')])
-    assert actr == set([ObjectName(schema='schema1', object_name='table3')])
+    assert actw == set([ObjectName('schema0', '*')])
+    assert actr == set([ObjectName('schema1', 'table3')])
 
 
 def test_initialize_spec(mockdbcontext):
