@@ -121,6 +121,12 @@ class ObjectName(object):
     def __lt__(self, other):
         return self.qualified_name < other.qualified_name
 
+    def __repr__(self):
+        if self.unqualified_name:
+            return "ObjectName('{}', '{}')".format(self.schema, self.unqualified_name)
+
+        return "ObjectName('{}')".format(self.schema)
+
     @classmethod
     def from_str(cls, text):
         """ Convert a text representation of a qualified object name into an ObjectName instance

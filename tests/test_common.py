@@ -115,6 +115,14 @@ def test_objectname_equivalence():
     assert objname1 == objname2
 
 
+def test_objectname_repr():
+    objname1 = common.ObjectName(schema='myschema')
+    assert repr(objname1) == "ObjectName('myschema')"
+
+    objname2 = common.ObjectName(schema='myschema', unqualified_name='mytable')
+    assert repr(objname2) == "ObjectName('myschema', 'mytable')"
+
+
 def test_objectname_sorting():
     list_of_objnames = [
         common.ObjectName(schema='baz'),
