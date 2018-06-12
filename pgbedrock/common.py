@@ -86,3 +86,78 @@ def run_query(cursor, verbose, query):
         else:
             click.secho(FAILED_QUERY_MSG.format(query, e), fg='red')
         sys.exit(1)
+
+
+class ObjectName(object):
+    """ Hold references to a specifc object, i.e. the schema and object name.
+
+    We do this in order to:
+        * Enable us to easily pick out the schema and object name for an object
+        * Be sure that when we use a schema or object name we won't have to worry
+            about existing double-quoting of these characteristics
+        * Be sure that when we get the fully-qualified name it will be double quoted
+            properly, i.e.  "myschema"."mytable"
+    """
+    def __init__(self, schema, object_name=None):
+        # Make sure schema and table are both stored without double quotes around
+        # them; we add these when ObjectName.qualified_name is called
+        self._schema = self._unquoted_item(schema)
+        self._object_name = self._unquoted_item(object_name)
+
+        if self._object_name and self._object_name == '*':
+            self._qualified_name = '{}.{}'.format(self.schema, self.object_name)
+        elif self._object_name and self._object_name != '*':
+            #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
+            self._qualified_name = '{}."{}"'.format(self.schema, self.object_name)
+        else:
+            self._qualified_name = '{}'.format(self.schema)
+
+    def __eq__(self, other):
+        return (self.schema == other.schema) and (self.object_name == other.object_name)
+
+    def __hash__(self):
+        return hash(self.qualified_name)
+
+    def __lt__(self, other):
+        return self.qualified_name < other.qualified_name
+
+    @classmethod
+    def from_str(cls, text):
+        """ Convert a text representation of a qualified object name into an ObjectName instance
+
+        For example, 'foo.bar', '"foo".bar', '"foo"."bar"', etc. will be converted an object with
+        schema 'foo' and object name 'bar'. Double quotes around the schema or object name are
+        stripped, but note that we don't do anything with impossible input like 'foo."bar".baz'
+        (which is impossible because the object name would include double quotes in it). Instead,
+        we let processing proceed and the issue bubble up downstream.
+
+        #TODO: add spec validation to prevent things like the impossible situation above, then
+        amend this docstring to note that.
+
+        """
+        if '.' not in text:
+            return cls(schema=text)
+
+        # If there are multiple periods we assume that the first one delineates the schema from
+        # the rest of the object, i.e. foo.bar.baz means schema foo and object "bar.baz"
+        schema, object_name = text.split('.', 1)
+        # Don't worry about removing double quotes as that happens in __init__
+        return cls(schema=schema, object_name=object_name)
+
+    @property
+    def schema(self):
+        return self._schema
+
+    @property
+    def object_name(self):
+        return self._object_name
+
+    @property
+    def qualified_name(self):
+        return self._qualified_name
+
+    @staticmethod
+    def _unquoted_item(item):
+        if item and item.startswith('"') and item.endswith('"'):
+            return item[1:-1]
+        return item

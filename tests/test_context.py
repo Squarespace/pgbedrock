@@ -1,7 +1,7 @@
 import pytest
 
-from conftest import quoted_object, run_setup_sql
-from pgbedrock import privileges as privs, attributes, ownerships, context
+from conftest import run_setup_sql
+from pgbedrock import attributes, common, context, privileges as privs, ownerships
 from pgbedrock import memberships
 
 
@@ -14,83 +14,6 @@ ROLES = tuple('role{}'.format(i) for i in range(4))
 TABLES = tuple('table{}'.format(i) for i in range(6))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
 DUMMY = 'foo'
-
-
-def test_dbobject_nonschema():
-    myobj = context.DBObject(schema='myschema', object_name='mytable')
-    assert myobj.schema == 'myschema'
-    assert myobj.object_name == 'mytable'
-    assert myobj.qualified_name == 'myschema."mytable"'
-
-
-def test_dbobject_schema():
-    myobj = context.DBObject(schema='myschema')
-    assert myobj.schema == 'myschema'
-    assert myobj.object_name is None
-    assert myobj.qualified_name == 'myschema'
-
-
-def test_dbobject_unquoted_item():
-    assert context.DBObject._unquoted_item('foo') == 'foo'
-    assert context.DBObject._unquoted_item('"foo"') == 'foo'
-
-
-def test_dbobject_equivalence():
-    myobj1 = context.DBObject(schema='myschema', object_name='mytable')
-    myobj2 = context.DBObject(schema='myschema', object_name='mytable')
-    assert myobj1 == myobj2
-
-    myobj1 = context.DBObject(schema='myschema')
-    myobj2 = context.DBObject(schema='myschema')
-    assert myobj1 == myobj2
-
-
-def test_dbobject_sorting():
-    list_of_dbobjects = [
-        context.DBObject(schema='baz'),
-        context.DBObject(schema='foo', object_name='gamma'),
-        context.DBObject(schema='foo', object_name='alpha'),
-        context.DBObject(schema='foo', object_name='bravo'),
-        context.DBObject(schema='bar'),
-    ]
-    expected = [
-        context.DBObject(schema='bar'),
-        context.DBObject(schema='baz'),
-        context.DBObject(schema='foo', object_name='alpha'),
-        context.DBObject(schema='foo', object_name='bravo'),
-        context.DBObject(schema='foo', object_name='gamma'),
-    ]
-
-    actual = sorted(list_of_dbobjects)
-    assert actual == expected
-
-
-@pytest.mark.parametrize('full_name', [('foo'), ('"foo"')])
-def test_dbobject_from_str_only_schema(full_name):
-    myobj = context.DBObject.from_str(full_name)
-    assert isinstance(myobj, context.DBObject)
-    assert myobj.schema == 'foo'
-    assert myobj.object_name is None
-    assert myobj.qualified_name == 'foo'
-
-
-@pytest.mark.parametrize('full_name, schema_name, object_name, qualified_name', [
-    ('foo.bar', 'foo', 'bar', 'foo."bar"'),
-    ('foo."bar"', 'foo', 'bar', 'foo."bar"'),
-    ('"foo".bar', 'foo', 'bar', 'foo."bar"'),
-    ('"foo"."bar"', 'foo', 'bar', 'foo."bar"'),
-    ('"foo".bar.baz', 'foo', 'bar.baz', 'foo."bar.baz"'),
-    ('"foo"."bar.baz"', 'foo', 'bar.baz', 'foo."bar.baz"'),
-    ('foo.*', 'foo', '*', 'foo.*'),
-])
-def test_objectname_from_str_schema_and_object(full_name, schema_name, object_name, qualified_name):
-    myobj = context.DBObject.from_str(full_name)
-    assert isinstance(myobj, context.DBObject)
-    assert myobj.schema == schema_name
-    assert myobj.object_name == object_name
-    assert myobj.qualified_name == qualified_name
-
-
 
 
 @run_setup_sql(
@@ -211,8 +134,8 @@ def test_get_all_current_nondefaults(cursor):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (context.DBObject(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
-                    (context.DBObject(schema=SCHEMAS[1], object_name=TABLES[3]), 'SELECT'),
+                    (common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
+                    (common.ObjectName(schema=SCHEMAS[1], object_name=TABLES[3]), 'SELECT'),
                 ]),
                 'write': set(),
             }
@@ -221,8 +144,8 @@ def test_get_all_current_nondefaults(cursor):
             'schemas': {
                 'read': set(),
                 'write': set([
-                    (context.DBObject(schema=SCHEMAS[0]), 'CREATE'),
-                    (context.DBObject(schema=SCHEMAS[1]), 'CREATE'),
+                    (common.ObjectName(schema=SCHEMAS[0]), 'CREATE'),
+                    (common.ObjectName(schema=SCHEMAS[1]), 'CREATE'),
                 ]),
             }
         },
@@ -230,8 +153,8 @@ def test_get_all_current_nondefaults(cursor):
             'schemas': {
                 'read': set(),
                 'write': set([
-                    (context.DBObject(schema=SCHEMAS[0]), 'CREATE'),
-                    (context.DBObject(schema=SCHEMAS[1]), 'CREATE'),
+                    (common.ObjectName(schema=SCHEMAS[0]), 'CREATE'),
+                    (common.ObjectName(schema=SCHEMAS[1]), 'CREATE'),
                 ]),
             }
         }
@@ -249,9 +172,9 @@ def test_get_all_current_nondefaults(cursor):
 
 @pytest.mark.parametrize('rolename, object_kind, access, expected', [
     ('role1', 'object_kind1', 'access1', set([
-        (context.DBObject(schema='foo', object_name='bar'), 'SELECT'),
-        (context.DBObject(schema='foo', object_name='baz'), 'SELECT'),
-        (context.DBObject(schema='foo', object_name='qux'), 'INSERT'),
+        (common.ObjectName(schema='foo', object_name='bar'), 'SELECT'),
+        (common.ObjectName(schema='foo', object_name='baz'), 'SELECT'),
+        (common.ObjectName(schema='foo', object_name='qux'), 'INSERT'),
     ])),
     ('role1', 'object_kind1', 'missing_access', set()),
     ('role1', 'missing_object_kind1', 'access1', set()),
@@ -263,9 +186,9 @@ def test_get_role_current_nondefaults(rolename, object_kind, access, expected):
         'role1': {
             'object_kind1': {
                 'access1': set([
-                    (context.DBObject(schema='foo', object_name='bar'), 'SELECT'),
-                    (context.DBObject(schema='foo', object_name='baz'), 'SELECT'),
-                    (context.DBObject(schema='foo', object_name='qux'), 'INSERT'),
+                    (common.ObjectName(schema='foo', object_name='bar'), 'SELECT'),
+                    (common.ObjectName(schema='foo', object_name='baz'), 'SELECT'),
+                    (common.ObjectName(schema='foo', object_name='qux'), 'INSERT'),
                 ])
             }
         }
@@ -279,8 +202,8 @@ def test_get_role_current_nondefaults(rolename, object_kind, access, expected):
 @pytest.mark.parametrize('access, expected', [
     ('write', set()),
     ('read', set([
-        context.DBObject(schema=SCHEMAS[0], object_name=TABLES[0]),
-        context.DBObject(schema=SCHEMAS[0], object_name=TABLES[1])
+        common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[0]),
+        common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[1])
     ])),
 ])
 def test_get_role_objects_with_access(access, expected):
@@ -289,8 +212,8 @@ def test_get_role_objects_with_access(access, expected):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (context.DBObject(schema=SCHEMAS[0], object_name=TABLES[0]), 'SELECT'),
-                    (context.DBObject(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
+                    (common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[0]), 'SELECT'),
+                    (common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[1]), 'SELECT'),
                 ])
             }
         }
@@ -328,21 +251,21 @@ def test_get_all_object_attributes(cursor):
     expected = {
         'tables': {
             SCHEMAS[0]: {
-                context.DBObject(SCHEMAS[0], TABLES[0]): {'owner': ROLES[1], 'is_dependent': False},
-                context.DBObject(SCHEMAS[0], TABLES[1]): {'owner': ROLES[1], 'is_dependent': False},
-                context.DBObject(SCHEMAS[0], TABLES[2]): {'owner': ROLES[3], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0], TABLES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0], TABLES[1]): {'owner': ROLES[1], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0], TABLES[2]): {'owner': ROLES[3], 'is_dependent': False},
             }
         },
         'sequences': {
             SCHEMAS[0]: {
-                context.DBObject(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
-                context.DBObject(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
-                context.DBObject(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[2], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0], SEQUENCES[0]): {'owner': ROLES[1], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0], SEQUENCES[1]): {'owner': ROLES[2], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0], SEQUENCES[2]): {'owner': ROLES[2], 'is_dependent': False},
             }
         },
         'schemas': {
             SCHEMAS[0]: {
-                context.DBObject(SCHEMAS[0]): {'owner': ROLES[0], 'is_dependent': False},
+                common.ObjectName(SCHEMAS[0]): {'owner': ROLES[0], 'is_dependent': False},
             },
             'public': {
                 'public': {'owner': 'postgres', 'is_dependent': False},
@@ -380,7 +303,7 @@ def test_get_all_object_attributes(cursor):
 def test_get_all_personal_schemas(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     actual = dbcontext.get_all_personal_schemas()
-    expected = set([context.DBObject(schema) for schema in ROLES[1:3]])
+    expected = set([common.ObjectName(schema) for schema in ROLES[1:3]])
     assert actual == expected
 
     # Make sure that this data is cached for future use
@@ -462,14 +385,14 @@ def test_is_superuser(all_role_attributes, expected):
 def test_get_all_schemas_and_owners(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     expected = {
-        context.DBObject(SCHEMAS[0]): ROLES[0],
-        context.DBObject(SCHEMAS[1]): ROLES[0],
-        context.DBObject(SCHEMAS[2]): ROLES[1],
-        context.DBObject(ROLES[1]): ROLES[1],
+        common.ObjectName(SCHEMAS[0]): ROLES[0],
+        common.ObjectName(SCHEMAS[1]): ROLES[0],
+        common.ObjectName(SCHEMAS[2]): ROLES[1],
+        common.ObjectName(ROLES[1]): ROLES[1],
         # These already existed
-        context.DBObject('public'): 'postgres',
-        context.DBObject('information_schema'): 'postgres',
-        context.DBObject('pg_catalog'): 'postgres',
+        common.ObjectName('public'): 'postgres',
+        common.ObjectName('information_schema'): 'postgres',
+        common.ObjectName('pg_catalog'): 'postgres',
     }
 
     actual = dbcontext.get_all_schemas_and_owners()
@@ -516,7 +439,7 @@ def test_get_all_memberships(cursor):
 
 
 def test_get_schema_owner():
-    schema = context.DBObject('foo')
+    schema = common.ObjectName('foo')
     expected_owner = 'bar'
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=True)
     dbcontext._cache['get_all_schemas_and_owners'] = lambda: {schema: expected_owner}
@@ -545,13 +468,13 @@ def test_get_all_nonschema_objects_and_owners(cursor):
     expected = {
         SCHEMAS[0]:
         [
-            context.ObjectInfo('tables', context.DBObject(schema=SCHEMAS[0], object_name=TABLES[0]), ROLES[0], False),
-            context.ObjectInfo('sequences', context.DBObject(schema=SCHEMAS[0], object_name=SEQUENCES[1]), ROLES[0], False),
+            context.ObjectInfo('tables', common.ObjectName(schema=SCHEMAS[0], object_name=TABLES[0]), ROLES[0], False),
+            context.ObjectInfo('sequences', common.ObjectName(schema=SCHEMAS[0], object_name=SEQUENCES[1]), ROLES[0], False),
         ],
         SCHEMAS[1]:
         [
-            context.ObjectInfo('tables', context.DBObject(schema=SCHEMAS[1], object_name=TABLES[0]), ROLES[1], False),
-            context.ObjectInfo('sequences', context.DBObject(schema=SCHEMAS[1], object_name=SEQUENCES[2]), ROLES[1], False),
+            context.ObjectInfo('tables', common.ObjectName(schema=SCHEMAS[1], object_name=TABLES[0]), ROLES[1], False),
+            context.ObjectInfo('sequences', common.ObjectName(schema=SCHEMAS[1], object_name=SEQUENCES[2]), ROLES[1], False),
         ],
     }
     actual = dbcontext.get_all_nonschema_objects_and_owners()

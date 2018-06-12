@@ -1,11 +1,10 @@
-from collections import defaultdict
 import logging
 import itertools
 
 import click
 
 from pgbedrock import common
-from pgbedrock.context import DatabaseContext, DBObject, PRIVILEGE_MAP
+from pgbedrock.context import DatabaseContext, PRIVILEGE_MAP
 
 
 logger = logging.getLogger(__name__)
@@ -188,10 +187,10 @@ class PrivilegeAnalyzer(object):
 
         self.current_defaults = dbcontext.get_role_current_defaults(rolename, object_kind, access)
 
-        # TODO: Use the DBObject instance instead of it's qualified_name
+        # TODO: Use the ObjectName instance instead of it's qualified_name
         current_nondefault_objects = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
         if current_nondefault_objects:
-            self.current_nondefaults = set([(dbo.qualified_name, priv) for dbo, priv in current_nondefault_objects])
+            self.current_nondefaults = set([(objname.qualified_name, priv) for objname, priv in current_nondefault_objects])
         else:
             self.current_nondefaults = set()
 
@@ -225,14 +224,14 @@ class PrivilegeAnalyzer(object):
         nondefaults_to_grant = self.desired_nondefaults.difference(self.current_nondefaults)
         logger.debug('nondefaults_to_grant: {}'.format(nondefaults_to_grant))
         if nondefaults_to_grant:
-            for objname, pg_priv_kind in sorted(nondefaults_to_grant):
-                self.grant_nondefault(objname, pg_priv_kind)
+            for objname_as_str, pg_priv_kind in sorted(nondefaults_to_grant):
+                self.grant_nondefault(objname_as_str, pg_priv_kind)
 
         nondefaults_to_revoke = self.current_nondefaults.difference(self.desired_nondefaults)
         logger.debug('nondefaults_to_revoke: {}'.format(nondefaults_to_revoke))
         if nondefaults_to_revoke:
-            for objname, pg_priv_kind in sorted(nondefaults_to_revoke):
-                self.revoke_nondefault(objname, pg_priv_kind)
+            for objname_as_str, pg_priv_kind in sorted(nondefaults_to_revoke):
+                self.revoke_nondefault(objname_as_str, pg_priv_kind)
 
     def determine_desired_defaults(self, schemas):
         """ For any given schema, we want to grant default privileges to this role from each role
@@ -252,12 +251,12 @@ class PrivilegeAnalyzer(object):
         # TODO: Remove this
         schema = item.split('.', 1)[0]
         if '.' in item:
-            objname = item.split('.', 1)[1]
+            objname_as_str = item.split('.', 1)[1]
         else:
-            objname = None
-        dbo = DBObject(schema=schema, object_name=objname)
+            objname_as_str = None
+        objname = common.ObjectName(schema=schema, object_name=objname_as_str)
         object_owners = self.all_object_attrs.get(objkind, dict()).get(schema, dict())
-        owner = object_owners.get(dbo, dict()).get('owner', None)
+        owner = object_owners.get(objname, dict()).get('owner', None)
         if owner:
             return owner
         else:
@@ -269,7 +268,7 @@ class PrivilegeAnalyzer(object):
         """ Get all objects of kind self.object_kind which are in the given schema and not owned by
         self.rolename """
         object_owners = self.all_object_attrs.get(self.object_kind, dict()).get(schema, dict())
-        return {dbo.qualified_name for dbo, attr in object_owners.items() if attr['owner'] != self.rolename}
+        return {objname.qualified_name for objname, attr in object_owners.items() if attr['owner'] != self.rolename}
 
     def get_schema_owner(self, schema):
         return self.get_object_owner(schema, objkind='schemas')
@@ -278,9 +277,9 @@ class PrivilegeAnalyzer(object):
         query = Q_GRANT_DEFAULT.format(grantor, schema, privilege, self.object_kind.upper(), self.rolename)
         self.sql_to_run.append(query)
 
-    def grant_nondefault(self, objname, privilege):
+    def grant_nondefault(self, objname_as_str, privilege):
         obj_kind_singular = self.object_kind.upper()[:-1]
-        query = Q_GRANT_NONDEFAULT.format(privilege, obj_kind_singular, objname, self.rolename)
+        query = Q_GRANT_NONDEFAULT.format(privilege, obj_kind_singular, objname_as_str, self.rolename)
         self.sql_to_run.append(query)
 
     def identify_desired_objects(self):
@@ -288,7 +287,7 @@ class PrivilegeAnalyzer(object):
         Create the sets of desired privileges. The sets will look like the following:
 
             self.desired_nondefaults:
-                {(objname, priv_name), ...}
+                {(objname_as_str, priv_name), ...}
                 Example: {('myschema.mytable', 'SELECT'), ...}
 
             self.desired_defaults:
@@ -332,7 +331,7 @@ class PrivilegeAnalyzer(object):
         query = Q_REVOKE_DEFAULT.format(grantor, schema, privilege, self.object_kind.upper(), self.rolename)
         self.sql_to_run.append(query)
 
-    def revoke_nondefault(self, objname, privilege):
+    def revoke_nondefault(self, objname_as_str, privilege):
         obj_kind_singular = self.object_kind.upper()[:-1]
-        query = Q_REVOKE_NONDEFAULT.format(privilege, obj_kind_singular, objname, self.rolename)
+        query = Q_REVOKE_NONDEFAULT.format(privilege, obj_kind_singular, objname_as_str, self.rolename)
         self.sql_to_run.append(query)

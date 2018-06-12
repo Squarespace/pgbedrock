@@ -4,7 +4,8 @@ import pytest
 import yaml
 
 from pgbedrock import spec_inspector
-from pgbedrock.context import ObjectAttributes, DBObject
+from pgbedrock.common import ObjectName
+from pgbedrock.context import ObjectAttributes
 
 
 @pytest.fixture
@@ -94,9 +95,9 @@ def test_ensure_no_object_owned_twice_schema_expansion_works(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema1': {
-                DBObject('schema1', 'table1'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema1', 'table2'): {'owner': 'owner2', 'is_dependent': False},
-                DBObject('schema1', 'table3'): {'owner': 'owner3', 'is_dependent': False},
+                ObjectName('schema1', 'table1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema1', 'table2'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('schema1', 'table3'): {'owner': 'owner3', 'is_dependent': False},
             },
         },
     }
@@ -127,9 +128,9 @@ def test_ensure_no_object_owned_twice_personal_schemas_expanded(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'role0': {
-                DBObject('role0', 'table0'): {'owner': 'role0', 'is_dependent': False},
-                DBObject('role0', 'table1'): {'owner': 'role0', 'is_dependent': False},
-                DBObject('role0', 'table2'): {'owner': 'role0', 'is_dependent': False},
+                ObjectName('role0', 'table0'): {'owner': 'role0', 'is_dependent': False},
+                ObjectName('role0', 'table1'): {'owner': 'role0', 'is_dependent': False},
+                ObjectName('role0', 'table2'): {'owner': 'role0', 'is_dependent': False},
             },
         },
     }
@@ -155,14 +156,14 @@ def test_ensure_no_object_owned_twice_personal_schemas_expanded(mockdbcontext):
 
 def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table1'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table3'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table1'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table3'), 'owner3', False),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema0': {
-                DBObject('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema0', 'table3'): {'owner': 'owner3', 'is_dependent': False},
+                ObjectName('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema0', 'table3'): {'owner': 'owner3', 'is_dependent': False},
             },
         },
     }
@@ -185,21 +186,21 @@ def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
 
 def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table1'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table2'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table3'), 'owner3', False),
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table4'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table1'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table2'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table3'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table4'), 'owner3', False),
         # This should be skipped as it is dependent
         ObjectAttributes('tables', 'schema0', 'schema0."table5"', 'owner3', True),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema0': {
-                DBObject('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema0', 'table2'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema0', 'table3'): {'owner': 'owner3', 'is_dependent': False},
-                DBObject('schema0', 'table4'): {'owner': 'owner3', 'is_dependent': False},
-                DBObject('schema0', 'table5'): {'owner': 'owner3', 'is_dependent': True},
+                ObjectName('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema0', 'table2'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema0', 'table3'): {'owner': 'owner3', 'is_dependent': False},
+                ObjectName('schema0', 'table4'): {'owner': 'owner3', 'is_dependent': False},
+                ObjectName('schema0', 'table5'): {'owner': 'owner3', 'is_dependent': True},
             },
         },
     }
@@ -220,14 +221,14 @@ def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
 
 def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'role0', DBObject(schema='role0', object_name='table1'), 'role0', False),
-        ObjectAttributes('tables', 'role0', DBObject(schema='role0', object_name='table2'), 'role0', False),
+        ObjectAttributes('tables', 'role0', ObjectName(schema='role0', object_name='table1'), 'role0', False),
+        ObjectAttributes('tables', 'role0', ObjectName(schema='role0', object_name='table2'), 'role0', False),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'role0': {
-                DBObject('role0', 'table1'): {'owner': 'role0', 'is_dependent': False},
-                DBObject('role0', 'table2'): {'owner': 'role0', 'is_dependent': False},
+                ObjectName('role0', 'table1'): {'owner': 'role0', 'is_dependent': False},
+                ObjectName('role0', 'table2'): {'owner': 'role0', 'is_dependent': False},
             },
         },
     }
@@ -242,14 +243,14 @@ def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
 
 def test_ensure_no_missing_objects_schema_expansion_works(mockdbcontext):
     mockdbcontext.get_all_raw_object_attributes = lambda: {
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table1'), 'owner1', False),
-        ObjectAttributes('tables', 'schema0', DBObject(schema='schema0', object_name='table2'), 'owner3', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table1'), 'owner1', False),
+        ObjectAttributes('tables', 'schema0', ObjectName(schema='schema0', object_name='table2'), 'owner3', False),
     }
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema0': {
-                DBObject('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema0', 'table2'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema0', 'table2'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
     }
@@ -268,9 +269,9 @@ def test_ensure_no_dependent_object_is_owned(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema0': {
-                DBObject('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema0', 'table2'): {'owner': 'owner2', 'is_dependent': True},
-                DBObject('schema0', 'table3'): {'owner': 'owner2', 'is_dependent': True},
+                ObjectName('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema0', 'table2'): {'owner': 'owner2', 'is_dependent': True},
+                ObjectName('schema0', 'table3'): {'owner': 'owner2', 'is_dependent': True},
             },
         },
     }
@@ -294,9 +295,9 @@ def test_ensure_no_dependent_object_is_owned_schema_expansion_skips_deps(mockdbc
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema0': {
-                DBObject('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema0', 'table2'): {'owner': 'owner2', 'is_dependent': True},
-                DBObject('schema0', 'table3'): {'owner': 'owner2', 'is_dependent': True},
+                ObjectName('schema0', 'table1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema0', 'table2'): {'owner': 'owner2', 'is_dependent': True},
+                ObjectName('schema0', 'table3'): {'owner': 'owner2', 'is_dependent': True},
             },
         },
     }
@@ -478,7 +479,7 @@ def test_ensure_no_undocumented_roles(mockdbcontext):
 
 def test_ensure_no_unowned_schemas(mockdbcontext):
     mockdbcontext.get_all_schemas_and_owners = lambda: {
-        DBObject('foo'): {}, DBObject('bar'): {}, DBObject('baz'): {}
+        ObjectName('foo'): {}, ObjectName('bar'): {}, ObjectName('baz'): {}
     }
     spec = {
         'qux': {

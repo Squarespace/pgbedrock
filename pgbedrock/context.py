@@ -58,7 +58,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
     ), tables_and_sequences AS (
         SELECT
             nsp.nspname AS schema,
-            c.relname AS objname,
+            c.relname AS unqualified_name,
             map.objkind,
             (aclexplode(c.relacl)).grantee AS grantee_oid,
             t_owner.rolname AS owner,
@@ -77,7 +77,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
     ), schemas AS (
         SELECT
              nsp.nspname AS schema,
-             NULL::TEXT AS objname,
+             NULL::TEXT AS unqualified_name,
              'schemas'::TEXT AS objkind,
              (aclexplode(nsp.nspacl)).grantee AS grantee_oid,
              t_owner.rolname AS owner,
@@ -96,7 +96,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
         t_grantee.rolname AS grantee,
         combined.objkind,
         combined.schema,
-        combined.objname,
+        combined.unqualified_name,
         combined.privilege_type
     FROM
         combined
@@ -148,7 +148,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         SELECT
             map.kind,
             nsp.nspname AS schema,
-            c.relname AS objname,
+            c.relname AS unqualified_name,
             c.relowner AS owner_id,
             -- Auto-dependency means that a sequence is linked to a table. Ownership of
             -- that sequence automatically derives from the table's ownership
@@ -167,13 +167,13 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         GROUP BY
             map.kind,
             schema,
-            objname,
+            unqualified_name,
             owner_id
     ), schemas AS (
         SELECT
             'schemas'::TEXT AS kind,
             nsp.nspname AS schema,
-            NULL::TEXT AS objname,
+            NULL::TEXT AS unqualified_name,
             nsp.nspowner AS owner_id,
             FALSE AS is_dependent
         FROM pg_namespace nsp
@@ -187,7 +187,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
     SELECT
         co.kind,
         co.schema,
-        co.objname,
+        co.unqualified_name,
         t_owner.rolname AS owner,
         co.is_dependent
     FROM combined AS co
@@ -233,85 +233,10 @@ PRIVILEGE_MAP = {
          },
 }
 
-ObjectInfo = namedtuple('ObjectInfo', ['kind', 'dbobject', 'owner', 'is_dependent'])
+ObjectInfo = namedtuple('ObjectInfo', ['kind', 'objname', 'owner', 'is_dependent'])
 ObjectAttributes = namedtuple('ObjectAttributes',
-                              ['kind', 'schema', 'dbobject', 'owner', 'is_dependent'])
+                              ['kind', 'schema', 'objname', 'owner', 'is_dependent'])
 VersionInfo = namedtuple('VersionInfo', ['postgres_version', 'redshift_version', 'is_redshift'])
-
-
-class DBObject(object):
-    """ Hold references to a specifc object, i.e. the schema and object name.
-
-    We do this in order to:
-        * Enable us to easily pick out the schema and object name for an object
-        * Be sure that when we use a schema or object name we won't have to worry
-            about existing double-quoting of these characteristics
-        * Be sure that when we get the fully-qualified name it will be double quoted
-            properly, i.e.  "myschema"."mytable"
-    """
-    def __init__(self, schema, object_name=None):
-        # Make sure schema and table are both stored without double quotes around
-        # them; we add these when DBObject.qualified_name is called
-        self._schema = self._unquoted_item(schema)
-        self._object_name = self._unquoted_item(object_name)
-
-        if self._object_name and self._object_name == '*':
-            self._qualified_name = '{}.{}'.format(self.schema, self.object_name)
-        elif self._object_name and self._object_name != '*':
-            #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
-            self._qualified_name = '{}."{}"'.format(self.schema, self.object_name)
-        else:
-            self._qualified_name = '{}'.format(self.schema)
-
-    def __eq__(self, other):
-        return (self.schema == other.schema) and (self.object_name == other.object_name)
-
-    def __hash__(self):
-        return hash(self.qualified_name)
-
-    def __lt__(self, other):
-        return self.qualified_name < other.qualified_name
-
-    @classmethod
-    def from_str(cls, text):
-        """ Convert a text representation of a qualified object name into an DBObject instance
-
-        For example, 'foo.bar', '"foo".bar', '"foo"."bar"', etc. will be converted an object with
-        schema 'foo' and object name 'bar'. Double quotes around the schema or object name are
-        stripped, but note that we don't do anything with impossible input like 'foo."bar".baz'
-        (which is impossible because the object name would include double quotes in it). Instead,
-        we let processing proceed and the issue bubble up downstream.
-
-        #TODO: add spec validation to prevent things like the impossible situation above, then
-        amend this docstring to note that.
-
-        """
-        if '.' not in text:
-            return cls(schema=text)
-
-        # If there are multiple periods we assume that the first one delineates the schema from
-        # the rest of the object, i.e. foo.bar.baz means schema foo and object "bar.baz"
-        schema, object_name = text.split('.', 1)
-        # Don't worry about removing double quotes as that happens in __init__
-        return cls(schema=schema, object_name=object_name)
-
-    @property
-    def schema(self):
-        return self._schema
-
-    @property
-    def object_name(self):
-        return self._object_name
-
-    @property
-    def qualified_name(self):
-        return self._qualified_name
-
-    @staticmethod
-    def _unquoted_item(item):
-        if item and item.startswith('"') and item.endswith('"'):
-            return item[1:-1]
-        return item
 
 
 class DatabaseContext(object):
@@ -424,10 +349,10 @@ class DatabaseContext(object):
         specified access for
 
         Returns:
-            set: A set of context.DBObject instances
+            set: A set of common.ObjectName instances
         """
         objects_with_access = self.get_role_current_nondefaults(rolename, object_kind, access)
-        results = set([dbo for dbo, _ in objects_with_access if dbo.schema == schema])
+        results = set([objname for objname, _ in objects_with_access if objname.schema == schema])
         return results
 
     def get_all_current_nondefaults(self):
@@ -435,11 +360,11 @@ class DatabaseContext(object):
             {roleA: {
                 objkindA: {
                     'read': set([
-                        (dbobject, privilege),
+                        (objname, privilege),
                         ...
                         ]),
                     'write': set([
-                        (dbobject, privilege),
+                        (objname, privilege),
                         ...
                         ]),
                     },
@@ -451,7 +376,7 @@ class DatabaseContext(object):
             This will not include privileges granted by this role to itself
         """
         NamedRow = namedtuple('NamedRow',
-                              ['grantee', 'objkind', 'schema', 'objname', 'privilege'])
+                              ['grantee', 'objkind', 'schema', 'unqualified_name', 'privilege'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_CURRENT_NONDEFAULTS)
         current_nondefaults = defaultdict(dict)
 
@@ -468,8 +393,8 @@ class DatabaseContext(object):
                     'write': set(),
                 }
 
-            dbobject = DBObject(schema=row.schema, object_name=row.objname)
-            entry = (dbobject, row.privilege)
+            objname = common.ObjectName(schema=row.schema, object_name=row.unqualified_name)
+            entry = (objname, row.privilege)
             role_nondefaults[row.objkind][access_key].add(entry)
 
         return current_nondefaults
@@ -480,7 +405,7 @@ class DatabaseContext(object):
 
         Returns:
             set: A set of tuples consisting of a database object and a privilege
-                with types (context.DBObject, str)
+                with types (common.ObjectName, str)
         """
         all_current_nondefaults = self.get_all_current_nondefaults()
         try:
@@ -511,11 +436,11 @@ class DatabaseContext(object):
         """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
         results = []
-        NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'objname', 'owner', 'is_dependent'])
+        NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'unqualified_name', 'owner', 'is_dependent'])
         for i in self.cursor.fetchall():
             row = NamedRow(*i)
-            dbobject = DBObject(schema=row.schema, object_name=row.objname)
-            entry = ObjectAttributes(row.kind, row.schema, dbobject, row.owner, row.is_dependent)
+            objname = common.ObjectName(schema=row.schema, object_name=row.unqualified_name)
+            entry = ObjectAttributes(row.kind, row.schema, objname, row.owner, row.is_dependent)
             results.append(entry)
         return results
 
@@ -523,11 +448,11 @@ class DatabaseContext(object):
         """ Return a dict of the form:
             {objkindA: {
                 'schemaA': {
-                    'dbobjectA': {
+                    'objnameA': {
                         'owner': ownerA,
                         'is_dependent': False,
                         },
-                    'dbobjectB': {
+                    'objnameB': {
                         'owner': ownerB,
                         'is_dependent': True,
                         },
@@ -549,8 +474,8 @@ class DatabaseContext(object):
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.dbobject] = {'owner': row.owner,
-                                                        'is_dependent': row.is_dependent}
+            objkind_owners[row.schema][row.objname] = {'owner': row.owner,
+                                                       'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -562,20 +487,20 @@ class DatabaseContext(object):
     def get_all_schemas_and_owners(self):
         """
         Returns:
-            dict: a dict of {schema_name: schema_owner}, where schema_name is a context.DBObject
+            dict: a dict of {schema_name: schema_owner}, where schema_name is a common.ObjectName
         """
         all_object_owners = self.get_all_object_attributes()
         schemas_subdict = all_object_owners.get('schemas', {})
         schema_owners = dict()
         for schema, attributes in schemas_subdict.items():
-            dbobject = DBObject(schema)
-            schema_owners[dbobject] = attributes[dbobject]['owner']
+            objname = common.ObjectName(schema)
+            schema_owners[objname] = attributes[objname]['owner']
         return schema_owners
 
     def get_schema_owner(self, schema):
         """
         Args:
-            schema (DBObject): The schema to find the owner for
+            schema (common.ObjectName): The schema to find the owner for
 
         Returns:
             str
@@ -592,16 +517,16 @@ class DatabaseContext(object):
         """ Return all personal schemas
 
         Returns:
-            set: A set of DBObject instances
+            set: A set of common.ObjectName instances
         """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_PERSONAL_SCHEMAS)
-        personal_schemas = set([DBObject(schema=row[0]) for row in self.cursor.fetchall()])
+        personal_schemas = set([common.ObjectName(schema=row[0]) for row in self.cursor.fetchall()])
         return personal_schemas
 
     def get_all_nonschema_objects_and_owners(self):
         """
         For all objkinds other than schemas return a dict of the form
-            {schema_name: [(objkind, dbobject, objowner, is_dependent), ...]}
+            {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
 
         This is primarily a helper for DatabaseContext.get_schema_objects so we have O(1)
         schema object lookups instead of needing to iterate through all objects every time
@@ -609,7 +534,7 @@ class DatabaseContext(object):
         schema_objects = defaultdict(list)
         for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
-                objinfo = ObjectInfo(row.kind, row.dbobject, row.owner, row.is_dependent)
+                objinfo = ObjectInfo(row.kind, row.objname, row.owner, row.is_dependent)
                 schema_objects[row.schema].append(objinfo)
 
         return schema_objects

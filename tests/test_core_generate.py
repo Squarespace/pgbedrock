@@ -5,9 +5,10 @@ import textwrap
 import psycopg2
 import pytest
 
-from conftest import quoted_object, run_setup_sql
+from conftest import run_setup_sql
 from pgbedrock import attributes as attr
-from pgbedrock.context import DatabaseContext, DBObject
+from pgbedrock.common import ObjectName
+from pgbedrock.context import DatabaseContext
 from pgbedrock import core_generate
 from pgbedrock import ownerships as own
 from pgbedrock import privileges as privs
@@ -107,17 +108,17 @@ def test_add_memberships(mockdbcontext):
 def test_add_schema_ownerships(mockdbcontext):
     mockdbcontext.get_all_schemas_and_owners = lambda: {
         # Non-personal schemas
-        DBObject('schema1'): 'owner1',
-        DBObject('schema2'): 'owner1',
-        DBObject('schema3'): 'owner2',
+        ObjectName('schema1'): 'owner1',
+        ObjectName('schema2'): 'owner1',
+        ObjectName('schema3'): 'owner2',
 
         # Personal schema
-        DBObject('owner1'): 'owner1',
+        ObjectName('owner1'): 'owner1',
 
         # Would not show up in get_all_personal_schemas as can_login is False
-        DBObject('owner2'): 'owner2',
+        ObjectName('owner2'): 'owner2',
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner1')])
+    mockdbcontext.get_all_personal_schemas = lambda: set([ObjectName('owner1')])
 
     spec = {
         'owner1': {'can_login': True},
@@ -130,34 +131,34 @@ def test_add_schema_ownerships(mockdbcontext):
     # so we have to convert the entries to a set to check equivalence
     assert actual['owner1']['can_login'] is True
     assert actual['owner1']['has_personal_schema'] is True
-    assert set(actual['owner1']['owns']['schemas']) == set([DBObject('schema1'), DBObject('schema2')])
+    assert set(actual['owner1']['owns']['schemas']) == set([ObjectName('schema1'), ObjectName('schema2')])
     assert 'has_personal_schema' not in actual['owner2']
-    assert set(actual['owner2']['owns']['schemas']) == set([DBObject('owner2'), DBObject('schema3')])
+    assert set(actual['owner2']['owns']['schemas']) == set([ObjectName('owner2'), ObjectName('schema3')])
 
 
 def test_add_nonschema_ownerships(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema1': {
-                DBObject('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
                 # This entry should be skipped because it is dependent
-                DBObject('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
-                DBObject('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
+                ObjectName('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
             },
             'schema2': {
                 # These all have the same owner, so it will become schema2.*
-                DBObject('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
             },
             'owner3': {
                 # This entry should be skipped because it is in a personal schema
-                DBObject('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
         'sequences': {},
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner3'), DBObject('owner5')])
+    mockdbcontext.get_all_personal_schemas = lambda: set([ObjectName('owner3'), ObjectName('owner5')])
 
     spec = {
         'owner1': {
@@ -172,9 +173,9 @@ def test_add_nonschema_ownerships(mockdbcontext):
 
     actual = core_generate.add_nonschema_ownerships(spec, mockdbcontext, 'tables')
     assert actual['owner1']['owns']['schemas'] == ['schema1']
-    assert set(actual['owner1']['owns']['tables']) == set([DBObject('schema1', 'mytable1'),
-                                                           DBObject('schema2', '*')])
-    assert actual['owner2']['owns']['tables'] == [DBObject('schema1', 'mytable3')]
+    assert set(actual['owner1']['owns']['tables']) == set([ObjectName('schema1', 'mytable1'),
+                                                           ObjectName('schema2', '*')])
+    assert actual['owner2']['owns']['tables'] == [ObjectName('schema1', 'mytable3')]
     assert actual['owner3'] == {}
     assert actual['owner4'] == {}
 
@@ -187,7 +188,7 @@ def test_add_nonschema_ownerships_empty_objkinds(mockdbcontext, objkind):
         },
         'sequences': {},
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner4'), DBObject('owner5')])
+    mockdbcontext.get_all_personal_schemas = lambda: set([ObjectName('owner4'), ObjectName('owner5')])
 
     spec = {
         'owner1': {
@@ -208,42 +209,42 @@ def test_add_ownerships(mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {
         'tables': {
             'schema1': {
-                DBObject('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema1', 'mytable1'): {'owner': 'owner1', 'is_dependent': False},
                 # This entry should be skipped because it is dependent
-                DBObject('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
-                DBObject('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('schema1', 'mytable2'): {'owner': 'owner2', 'is_dependent': True},
+                ObjectName('schema1', 'mytable3'): {'owner': 'owner2', 'is_dependent': False},
             },
             'schema2': {
                 # These all have the same owner, so it will become schema2.*
-                DBObject('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'mytable4'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'mytable5'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'mytable6'): {'owner': 'owner1', 'is_dependent': False},
             },
             'owner3': {
                 # This entry should be skipped because it is in a personal schema
-                DBObject('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('owner3', 'mytable7'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
         'sequences': {
             'schema1': {
-                DBObject('schema1', 'myseq1'): {'owner': 'owner2', 'is_dependent': False},
-                DBObject('schema1', 'myseq2'): {'owner': 'owner3', 'is_dependent': True},
+                ObjectName('schema1', 'myseq1'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('schema1', 'myseq2'): {'owner': 'owner3', 'is_dependent': True},
             },
             'schema2': {
-                DBObject('schema2', 'myseq3'): {'owner': 'owner1', 'is_dependent': False},
-                DBObject('schema2', 'myseq4'): {'owner': 'owner2', 'is_dependent': False},
+                ObjectName('schema2', 'myseq3'): {'owner': 'owner1', 'is_dependent': False},
+                ObjectName('schema2', 'myseq4'): {'owner': 'owner2', 'is_dependent': False},
             },
         },
     }
     mockdbcontext.get_all_schemas_and_owners = lambda: {
         # Non-personal schemas
-        DBObject('schema1'): 'owner1',
-        DBObject('schema2'): 'owner1',
+        ObjectName('schema1'): 'owner1',
+        ObjectName('schema2'): 'owner1',
 
         # Personal schema
-        DBObject('owner3'): 'owner3',
+        ObjectName('owner3'): 'owner3',
     }
-    mockdbcontext.get_all_personal_schemas = lambda: set([DBObject('owner3')])
+    mockdbcontext.get_all_personal_schemas = lambda: set([ObjectName('owner3')])
 
     spec = {
         'owner1': {},
@@ -253,19 +254,19 @@ def test_add_ownerships(mockdbcontext):
 
     actual = core_generate.add_ownerships(spec, mockdbcontext)
     # Schema ownership assertions
-    assert set(actual['owner1']['owns']['schemas']) == set([DBObject('schema1'),
-                                                            DBObject('schema2')])
+    assert set(actual['owner1']['owns']['schemas']) == set([ObjectName('schema1'),
+                                                            ObjectName('schema2')])
     assert actual['owner3'] == {'has_personal_schema': True}
 
     # Table ownership assertions
-    assert set(actual['owner1']['owns']['tables']) == set([DBObject('schema1', 'mytable1'),
-                                                           DBObject('schema2', '*')])
-    assert actual['owner2']['owns']['tables'] == [DBObject('schema1', 'mytable3')]
+    assert set(actual['owner1']['owns']['tables']) == set([ObjectName('schema1', 'mytable1'),
+                                                           ObjectName('schema2', '*')])
+    assert actual['owner2']['owns']['tables'] == [ObjectName('schema1', 'mytable3')]
 
     # Sequence ownership assertions
-    assert actual['owner1']['owns']['sequences'] == [DBObject('schema2', 'myseq3')]
-    assert set(actual['owner2']['owns']['sequences']) == set([DBObject('schema1', '*'),
-                                                              DBObject('schema2', 'myseq4')])
+    assert actual['owner1']['owns']['sequences'] == [ObjectName('schema2', 'myseq3')]
+    assert set(actual['owner2']['owns']['sequences']) == set([ObjectName('schema1', '*'),
+                                                              ObjectName('schema2', 'myseq4')])
 
 
 @run_setup_sql([
@@ -291,12 +292,12 @@ def test_add_ownerships(mockdbcontext):
 ])
 @pytest.mark.parametrize('objects, expected', [
     (
-        set([DBObject('role1', '*'), DBObject('role3', '*')]),
-        set([DBObject('personal_schemas', '*')])
+        set([ObjectName('role1', '*'), ObjectName('role3', '*')]),
+        set([ObjectName('personal_schemas', '*')])
     ),
     (
-        set([DBObject('role1', '*'), DBObject('role3', 'table1')]),
-        set([DBObject('role1', '*'), DBObject('role3', 'table1')])
+        set([ObjectName('role1', '*'), ObjectName('role3', 'table1')]),
+        set([ObjectName('role1', '*'), ObjectName('role3', 'table1')])
     ),
 ])
 def test_collapse_personal_schemas(cursor, objects, expected):
@@ -329,12 +330,12 @@ def test_collapse_personal_schemas(cursor, objects, expected):
 ])
 @pytest.mark.parametrize('objects, expected', [
     (
-        set([DBObject('role1', '*'), DBObject('role3', '*')]),
-        set([DBObject('personal_schemas', '*')])
+        set([ObjectName('role1', '*'), ObjectName('role3', '*')]),
+        set([ObjectName('personal_schemas', '*')])
     ),
     (
-        set([DBObject('role1', '*'), DBObject('role2', '*'), DBObject('role3', '*')]),
-        set([DBObject('personal_schemas', '*'), DBObject('role2', '*')])
+        set([ObjectName('role1', '*'), ObjectName('role2', '*'), ObjectName('role3', '*')]),
+        set([ObjectName('personal_schemas', '*'), ObjectName('role2', '*')])
     ),
 ])
 def test_collapse_personal_schemas_only_logginable_roles(cursor, objects, expected):
@@ -345,7 +346,7 @@ def test_collapse_personal_schemas_only_logginable_roles(cursor, objects, expect
 
 
 def test_collapse_personal_schemas_no_personal_schemas_exist(cursor):
-    objects = set([DBObject('role1', '*'), DBObject('role2', 'foo'), DBObject('role3', 'bar')])
+    objects = set([ObjectName('role1', '*'), ObjectName('role2', 'foo'), ObjectName('role3', 'bar')])
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.collapse_personal_schemas(role='role0', objects=objects,
                                                      objkind='tables', dbcontext=dbcontext)
@@ -369,10 +370,10 @@ def test_collapse_personal_schemas_no_personal_schemas_exist(cursor):
 ])
 def test_collapse_personal_schemas_empty_schema_with_default_priv(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
-    objects = set([DBObject('role1', '*'), DBObject('role2', '*')])
+    objects = set([ObjectName('role1', '*'), ObjectName('role2', '*')])
     actual = core_generate.collapse_personal_schemas(role='role0', objects=objects,
                                                      objkind='tables', dbcontext=dbcontext)
-    expected = set([DBObject('personal_schemas', '*')])
+    expected = set([ObjectName('personal_schemas', '*')])
     assert actual == expected
 
 
@@ -404,11 +405,11 @@ def test_add_privileges(cursor):
         'role0': {
             'privileges': {
                 'schemas': {
-                    'read': set([DBObject('schema0')]),
-                    'write': set([DBObject('schema3')]),
+                    'read': set([ObjectName('schema0')]),
+                    'write': set([ObjectName('schema3')]),
                 },
                 'tables': {
-                    'write': set([DBObject('schema0', '*')]),
+                    'write': set([ObjectName('schema0', '*')]),
                 },
             },
         },
@@ -443,8 +444,8 @@ def test_determine_schema_privileges_both_read_and_write_no_personal_schemas(cur
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'write': set([DBObject('schema2'), DBObject('schema3')]),
-        'read': set([DBObject('schema0'), DBObject('schema1')]),
+        'write': set([ObjectName('schema2'), ObjectName('schema3')]),
+        'read': set([ObjectName('schema0'), ObjectName('schema1')]),
     }
     assert actual == expected
 
@@ -474,7 +475,7 @@ def test_determine_schema_privileges_only_read_exists(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'read': set([DBObject('schema0')]),
+        'read': set([ObjectName('schema0')]),
     }
     assert actual == expected
 
@@ -514,8 +515,8 @@ def test_determine_schema_privileges_personal_schemas(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'write': set([DBObject('schema1')]),
-        'read': set([DBObject('personal_schemas'), DBObject('schema0')]),
+        'write': set([ObjectName('schema1')]),
+        'read': set([ObjectName('personal_schemas'), ObjectName('schema0')]),
     }
     assert actual == expected
 
@@ -537,7 +538,7 @@ def test_determine_schema_privileges_only_write_exists(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actual = core_generate.determine_schema_privileges('role0', dbcontext)
     expected = {
-        'write': set([DBObject('schema0'), DBObject('schema1')]),
+        'write': set([ObjectName('schema0'), ObjectName('schema1')]),
     }
     assert actual == expected
 
@@ -570,10 +571,10 @@ def test_determine_schema_privileges_has_personal_schema(cursor):
 def test_determine_nonschema_privileges_for_schema_no_objects_with_default_priv(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([DBObject(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -587,7 +588,7 @@ def test_determine_nonschema_privileges_for_schema_no_objects_with_default_priv(
 def test_determine_nonschema_privileges_for_schema_no_objects(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
     assert actr == set()
@@ -610,9 +611,9 @@ def test_determine_nonschema_privileges_for_schema_no_objects(cursor):
 def test_determine_nonschema_privileges_for_schema_default_write(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -633,9 +634,9 @@ def test_determine_nonschema_privileges_for_schema_default_write(cursor):
 def test_determine_nonschema_privileges_for_schema_has_all_writes(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -658,10 +659,10 @@ def test_determine_nonschema_privileges_for_schema_has_all_writes(cursor):
 def test_determine_nonschema_privileges_for_schema_some_write_default_read(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='table0')])
-    assert actr == set([DBObject(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName(schema='schema0', object_name='table0')])
+    assert actr == set([ObjectName(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -681,10 +682,10 @@ def test_determine_nonschema_privileges_for_schema_some_write_default_read(curso
 def test_determine_nonschema_privileges_for_schema_no_writes_all_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([DBObject(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -708,13 +709,13 @@ def test_determine_nonschema_privileges_for_schema_no_writes_all_reads(cursor):
 def test_determine_nonschema_privileges_for_schema_some_writes_some_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set([
-        DBObject(schema='schema0', object_name='table1'),
-        DBObject(schema='schema0', object_name='table2'),
+        ObjectName(schema='schema0', object_name='table1'),
+        ObjectName(schema='schema0', object_name='table2'),
     ])
-    assert actr == set([DBObject(schema='schema0', object_name='table0')])
+    assert actr == set([ObjectName(schema='schema0', object_name='table0')])
 
 
 @run_setup_sql([
@@ -736,9 +737,9 @@ def test_determine_nonschema_privileges_for_schema_some_writes_some_reads(cursor
 def test_determine_nonschema_privileges_for_schema_all_writes(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -761,9 +762,9 @@ def test_determine_nonschema_privileges_for_schema_all_writes(cursor):
 def test_determine_nonschema_privileges_for_schema_default_write_some_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -782,9 +783,9 @@ def test_determine_nonschema_privileges_for_schema_default_write_some_reads(curs
 def test_determine_nonschema_privileges_for_schema_default_write_and_default_read(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='*')])
+    assert actw == set([ObjectName(schema='schema0', object_name='*')])
     assert actr == set()
 
 
@@ -805,10 +806,10 @@ def test_determine_nonschema_privileges_for_schema_default_write_and_default_rea
 def test_determine_nonschema_privileges_for_schema_no_write_all_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([DBObject(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName(schema='schema0', object_name='*')])
 
 
 @run_setup_sql([
@@ -827,10 +828,10 @@ def test_determine_nonschema_privileges_for_schema_no_write_all_reads(cursor):
 def test_determine_nonschema_privileges_for_schema_no_writes_some_reads(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
-    assert actr == set([DBObject(schema='schema0', object_name='table0')])
+    assert actr == set([ObjectName(schema='schema0', object_name='table0')])
 
 
 @run_setup_sql([
@@ -848,7 +849,7 @@ def test_determine_nonschema_privileges_for_schema_no_writes_some_reads(cursor):
 def test_determine_nonschema_privileges_for_schema_no_objects_of_objkind(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_nonschema_privileges_for_schema('role0', 'tables',
-                                                                         DBObject('schema0'),
+                                                                         ObjectName('schema0'),
                                                                          dbcontext)
     assert actw == set()
     assert actr == set()
@@ -883,8 +884,8 @@ def test_determine_nonschema_privileges_for_schema_no_objects_of_objkind(cursor)
 def test_determine_all_nonschema_privileges(cursor):
     dbcontext = DatabaseContext(cursor, verbose=True)
     actw, actr = core_generate.determine_all_nonschema_privileges('role0', 'tables', dbcontext)
-    assert actw == set([DBObject(schema='schema0', object_name='*')])
-    assert actr == set([DBObject(schema='schema1', object_name='table3')])
+    assert actw == set([ObjectName(schema='schema0', object_name='*')])
+    assert actr == set([ObjectName(schema='schema1', object_name='table3')])
 
 
 def test_initialize_spec(mockdbcontext):
@@ -963,17 +964,17 @@ def test_output_spec(capsys):
     assert out == expected
 
 
-def test_output_spec_renders_dbobjects(capsys):
+def test_output_spec_renders_objnames(capsys):
     spec = {
         'roleA': {
             'privileges': {
                 'schemas': [
-                    DBObject('foo'),
-                    DBObject('bar'),
+                    ObjectName('foo'),
+                    ObjectName('bar'),
                 ],
                 'tables': [
-                    DBObject('foo', '*'),
-                    DBObject('bar', 'baz'),
+                    ObjectName('foo', '*'),
+                    ObjectName('bar', 'baz'),
                 ],
             },
         },
