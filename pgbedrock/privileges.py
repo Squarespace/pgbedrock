@@ -248,14 +248,8 @@ class PrivilegeAnalyzer(object):
 
     def get_object_owner(self, item, objkind=None):
         objkind = objkind or self.object_kind
-        # TODO: Remove this
-        schema = item.split('.', 1)[0]
-        if '.' in item:
-            objname_as_str = item.split('.', 1)[1]
-        else:
-            objname_as_str = None
-        objname = common.ObjectName(schema=schema, unqualified_name=objname_as_str)
-        object_owners = self.all_object_attrs.get(objkind, dict()).get(schema, dict())
+        objname = common.ObjectName.from_str(item)
+        object_owners = self.all_object_attrs.get(objkind, dict()).get(objname.schema, dict())
         owner = object_owners.get(objname, dict()).get('owner', None)
         if owner:
             return owner
