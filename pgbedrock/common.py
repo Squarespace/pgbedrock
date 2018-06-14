@@ -108,6 +108,9 @@ class ObjectName(object):
             self._qualified_name = '{}.{}'.format(self.schema, self.unqualified_name)
         elif self._unqualified_name and self._unqualified_name != '*':
             #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
+            # Note that if we decide to support "schema"."table" within YAML that we'll need to
+            # add a custom constructor since otherwise YAML gets confused unless you do
+            # '"schema"."table"'
             self._qualified_name = '{}."{}"'.format(self.schema, self.unqualified_name)
         else:
             self._qualified_name = '{}'.format(self.schema)

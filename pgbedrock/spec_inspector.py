@@ -1,4 +1,5 @@
 from collections import defaultdict
+import copy
 import os
 
 import cerberus
@@ -81,6 +82,35 @@ SPEC_SCHEMA_YAML = """
                 schema:
                     type: string
     """
+
+
+def convert_spec_to_objectnames(spec):
+    """ Convert object names in a loaded spec from strings to ObjectName instances
+
+    This converts items in the following sublists, if those sublists exist:
+        * <role_name> -> owns -> <key in context.PRIVILEGE_MAP>
+        * <role_name> -> privileges -> <key in context.PRIVILEGE_MAP> -> read
+        * <role_name> -> privileges -> <key in context.PRIVILEGE_MAP> -> write
+    """
+    output_spec = copy.deepcopy(spec)
+    for role, config in output_spec.items():
+        if not config:
+            continue
+
+        for objkind, owned_items in config.get('owns', {}).items():
+            if not owned_items:
+                continue
+            converted = [common.ObjectName.from_str(item) for item in owned_items]
+            config['owns'][objkind] = converted
+
+        for objkind, perm_dicts in config.get('privileges', {}).items():
+            for priv_kind, granted_items in perm_dicts.items():
+                if not granted_items:
+                    continue
+                converted = [common.ObjectName.from_str(item) for item in granted_items]
+                config['privileges'][objkind][priv_kind] = converted
+
+    return output_spec
 
 
 def ensure_no_object_owned_twice(spec, dbcontext, objkind):

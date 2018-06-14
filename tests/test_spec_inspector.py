@@ -509,3 +509,185 @@ def test_get_spec_schemas():
     }
 
     assert spec_inspector.get_spec_schemas(spec) == set(['role0', 'schemas0', 'schemas1'])
+
+
+def test_convert_spec_to_objectnames_owns_subdict():
+    yaml_spec = """
+        roleA:
+            owns:
+                schemas:
+                    - myschema1
+                    - myschema2
+                    - myschema3
+                tables:
+                    - myschema1.*
+                    - '"myschema2".*'
+                    - myschema3.mytable1
+                    - 'myschema3."mytable2"'
+                    - '"myschema3".mytable3'
+                    - '"myschema3"."mytable4"'
+        """
+
+    expected_spec = {
+        'roleA': {
+            'owns': {
+                'schemas': [
+                    ObjectName('myschema1'),
+                    ObjectName('myschema2'),
+                    ObjectName('myschema3'),
+                ],
+                'tables': [
+                    ObjectName('myschema1', '*'),
+                    ObjectName('myschema2', '*'),
+                    ObjectName('myschema3', 'mytable1'),
+                    ObjectName('myschema3', 'mytable2'),
+                    ObjectName('myschema3', 'mytable3'),
+                    ObjectName('myschema3', 'mytable4'),
+                ],
+            }
+        }
+    }
+    loaded_spec = yaml.load(yaml_spec)
+    actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
+    assert actual_spec == expected_spec
+
+
+def test_convert_spec_to_objectnames_privileges_subdict():
+    yaml_spec = """
+        roleA:
+            privileges:
+                schemas:
+                    read:
+                        - myschema1
+                        - myschema2
+                    write:
+                        - myschema3
+                tables:
+                    read:
+                        - myschema1.*
+                        - myschema2.mytable1
+                    write:
+                        - myschema3.mytable1
+        """
+
+    expected_spec = {
+        'roleA': {
+            'privileges': {
+                'schemas': {
+                    'read': [
+                        ObjectName('myschema1'),
+                        ObjectName('myschema2'),
+                    ],
+                    'write': [
+                        ObjectName('myschema3'),
+                    ],
+                },
+                'tables': {
+                    'read': [
+                        ObjectName('myschema1', '*'),
+                        ObjectName('myschema2', 'mytable1'),
+                    ],
+                    'write': [
+                        ObjectName('myschema3', 'mytable1'),
+                    ],
+                }
+            }
+        }
+    }
+    loaded_spec = yaml.load(yaml_spec)
+    actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
+    assert actual_spec == expected_spec
+
+
+def test_convert_spec_to_objectnames_other_subdicts_untouched():
+    yaml_spec = """
+        roleA:
+            can_login: true
+            has_personal_schema: false
+            is_superuser: false
+            attributes:
+                - CREATEDB
+                - CREATEROLE
+            member_of:
+                - roleB
+            owns:
+                schemas:
+                    - myschema
+                tables:
+                    - myschema.mytable
+            privileges:
+                schemas:
+                    read:
+                        - myschema2
+                tables:
+                    read:
+                        - myschema2.mytable1
+                    write:
+                        - myschema2.mytable2
+
+        roleB:
+            owns:
+                sequences:
+                    - myschema.mysequence
+        """
+
+    expected_spec = {
+        'roleA': {
+            'can_login': True,
+            'has_personal_schema': False,
+            'is_superuser': False,
+            'attributes': [
+                'CREATEDB',
+                'CREATEROLE',
+            ],
+            'member_of': [
+                'roleB',
+            ],
+            'owns': {
+                'schemas': [
+                    ObjectName('myschema'),
+                ],
+                'tables': [
+                    ObjectName('myschema', 'mytable'),
+                ],
+            },
+            'privileges': {
+                'schemas': {
+                    'read': [
+                        ObjectName('myschema2'),
+                    ],
+                },
+                'tables': {
+                    'read': [
+                        ObjectName('myschema2', 'mytable1'),
+                    ],
+                    'write': [
+                        ObjectName('myschema2', 'mytable2'),
+                    ],
+                },
+            },
+        },
+        'roleB': {
+            'owns': {
+                'sequences': [
+                    ObjectName('myschema', 'mysequence')
+                ],
+            },
+        },
+    }
+    loaded_spec = yaml.load(yaml_spec)
+    actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
+    assert actual_spec == expected_spec
+
+
+def test_convert_spec_to_objectnames_empty_role_definition_ok():
+    yaml_spec = """
+        roleA:
+        """
+
+    expected_spec = {
+        'roleA': None,
+    }
+    loaded_spec = yaml.load(yaml_spec)
+    actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
+    assert actual_spec == expected_spec
