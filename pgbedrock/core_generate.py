@@ -448,8 +448,8 @@ def output_spec(spec):
         return dumper.represent_scalar('tag:yaml.org,2002:str', data.qualified_name)
         # return dumper.represent_scalar('!str', data.qualified_name)
 
-    yaml.add_representer(dict, represent_dict)
-    yaml.add_representer(common.ObjectName, represent_objname)
+    FormattedDumper.add_representer(dict, represent_dict)
+    FormattedDumper.add_representer(common.ObjectName, represent_objname)
 
     print(yaml.dump(spec, Dumper=FormattedDumper, default_flow_style=False, indent=4))
 
