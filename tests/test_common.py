@@ -167,3 +167,10 @@ def test_objectname_from_str_schema_and_object(full_name, schema_name, unqualifi
     assert objname.schema == schema_name
     assert objname.unqualified_name == unqualified_name
     assert objname.qualified_name == qualified_name
+
+
+def test_objectname_only_schema():
+    objname = common.ObjectName(schema='myschema', unqualified_name='mytable')
+    only_schema = objname.only_schema()
+    assert only_schema.qualified_name == 'myschema'
+    assert only_schema.unqualified_name is None

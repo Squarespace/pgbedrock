@@ -36,15 +36,13 @@ def analyze_ownerships(spec, cursor, verbose):
             ownerships = config.get('owns', {})
             for objkind, objects_to_own in ownerships.items():
                 if objkind == 'schemas':
-                    for schema in objects_to_own:
-                        objname = common.ObjectName.from_str(schema)
+                    for objname in objects_to_own:
                         sql_to_run = SchemaAnalyzer(rolename=rolename, objname=objname,
                                                     dbcontext=dbcontext,
                                                     is_personal_schema=False).analyze()
                         all_sql_to_run += sql_to_run
                 else:
-                    for objname_as_str in objects_to_own:
-                        objname = common.ObjectName.from_str(objname_as_str)
+                    for objname in objects_to_own:
                         sql_to_run = NonschemaAnalyzer(rolename=rolename, objname=objname,
                                                        objkind=objkind, dbcontext=dbcontext).analyze()
                         all_sql_to_run += sql_to_run

@@ -28,7 +28,8 @@ def test_ensure_no_schema_owned_twice():
             schemas:
                 - finance_documents
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_schema_owned_twice(spec)
     expected = spec_inspector.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('finance_documents',
                                                                    'jfauxnance, jfinance')
@@ -47,7 +48,8 @@ def test_ensure_no_schema_owned_twice_with_personal_schemas():
             schemas:
                 - jfinance
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_schema_owned_twice(spec)
     expected = spec_inspector.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('jfinance',
                                                                    'jfauxnance, jfinance')
@@ -84,7 +86,8 @@ def test_ensure_no_object_owned_twice(mockdbcontext):
                 - schema1.table1
                 - schema1."table2"
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
     expected = spec_inspector.MULTIPLE_OBJKIND_OWNER_ERR_MSG.format('Table', 'schema1."table1"',
                                                                     'role0, role1')
@@ -115,7 +118,8 @@ def test_ensure_no_object_owned_twice_schema_expansion_works(mockdbcontext):
                 - schema1."table1"
                 - schema1.table3
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
     expected = set([
         spec_inspector.MULTIPLE_OBJKIND_OWNER_ERR_MSG.format('Table', 'schema1."table1"', 'role0, role1'),
@@ -145,7 +149,8 @@ def test_ensure_no_object_owned_twice_personal_schemas_expanded(mockdbcontext):
                 - role0."table0"
                 - role0.table1
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
     expected = set([
         spec_inspector.MULTIPLE_OBJKIND_OWNER_ERR_MSG.format('Table', 'role0."table0"', 'role0, role1'),
@@ -177,7 +182,8 @@ def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
                 - schema0.table3
                 - schema0.table4
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     expected = spec_inspector.UNKNOWN_OBJECTS_MSG.format(objkind='tables',
                                                          unknown_objects='schema0."table2", schema0."table4"')
@@ -212,7 +218,8 @@ def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
                 - schema0."table1"
                 - schema0.table3
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     expected = spec_inspector.UNOWNED_OBJECTS_MSG.format(objkind='tables',
                                                          unowned_objects='schema0."table2", schema0."table4"')
@@ -236,7 +243,8 @@ def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
     role0:
         has_personal_schema: true
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     assert errors == []
 
@@ -260,7 +268,8 @@ def test_ensure_no_missing_objects_schema_expansion_works(mockdbcontext):
             tables:
                 - schema0.*
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     assert errors == []
 
@@ -284,7 +293,8 @@ def test_ensure_no_dependent_object_is_owned(mockdbcontext):
                 - schema0.table2
                 - schema0.table3
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_dependent_object_is_owned(spec, mockdbcontext, 'tables')
     expected = spec_inspector.DEPENDENT_OBJECTS_MSG.format(objkind='tables',
                                                            dep_objs='schema0."table2", schema0."table3"')
@@ -307,7 +317,8 @@ def test_ensure_no_dependent_object_is_owned_schema_expansion_skips_deps(mockdbc
             tables:
                 - schema0.*
     """
-    spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.load(spec_yaml)
+    spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_dependent_object_is_owned(spec, mockdbcontext, 'tables')
     assert errors == []
 
@@ -334,7 +345,8 @@ def test_verify_spec_fails_object_referenced_read_write():
 
     privilege_types = ('schemas', 'sequences', 'tables')
     for t in privilege_types:
-        spec = yaml.load(spec_yaml.format(t))
+        unconverted_spec = yaml.load(spec_yaml.format(t))
+        spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
         errors = spec_inspector.ensure_no_redundant_privileges(spec)
         err_string = "margerie: {'%s': ['big_bad']}" % t
         expected = spec_inspector.OBJECT_REF_READ_WRITE_ERR.format(err_string)
@@ -363,7 +375,7 @@ def test_verify_spec_fails_role_defined_multiple_times(tmpdir):
     assert [expected] == errors
 
 
-def test_verify_spec_fails():
+def test_ensure_valid_schema_fails():
     """ We could check more functionality, but at that point we'd just be testing cerberus. This
     test is just to verify that a failure will happen and will be presented as we'd expect """
     spec_yaml = """
@@ -377,7 +389,7 @@ def test_verify_spec_fails():
     assert expected == errors[0]
 
 
-def test_verify_spec_succeeds():
+def test_ensure_valid_schema_succeeds():
     spec_yaml = """
         fred:
             attributes:
@@ -484,7 +496,7 @@ def test_ensure_no_unowned_schemas(mockdbcontext):
     spec = {
         'qux': {
             'owns': {
-                'schemas': ['baz'],
+                'schemas': [ObjectName('baz')],
             },
         },
     }

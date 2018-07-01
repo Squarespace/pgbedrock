@@ -56,7 +56,6 @@ def analyze_privileges(spec, cursor, verbose):
                 desired_items_this_obj = all_desired_privs.get(object_kind, {})
 
                 for access in ('read', 'write'):
-
                     desired_items = desired_items_this_obj.get(access, [])
                     # If a write privilege is desired then read access is as well
                     if access == 'read':
@@ -97,12 +96,13 @@ def determine_personal_schemas(spec):
     personal_schemas = set()
     for role, config in spec.items():
         if config and common.parse_bool(config.get('has_personal_schema', False)):
-            personal_schemas.add(role)
+            personal_schemas.add(common.ObjectName(role))
 
     return personal_schemas
 
 
 def determine_schema_owners(spec):
+    ''' Create a dict of {schema: owner} '''
     schema_owners = dict()
     for role, config in spec.items():
         if not config:
@@ -111,7 +111,7 @@ def determine_schema_owners(spec):
         if 'owns' in config:
             owned_schemas = config['owns'].get('schemas', ())
             for schema in owned_schemas:
-                schema_owners[schema] = role
+                schema_owners[schema.qualified_name] = role
 
         if common.parse_bool(config.get('has_personal_schema', False)):
             schema_owners[role] = role
@@ -132,10 +132,14 @@ def determine_superusers(spec):
 
 
 def determine_schema_writers(spec):
-    """ Create a dict mapping from each schema to all roles that can
-    create objects in that schema """
+    """
+    Create a dict mapping from each schema to all roles that can create objects in that
+    schema, i.e.:
+
+        {schema_as_str: [roleA, roleB, roleC], ...}
+    """
     members_of_role = determine_role_members(spec)
-    personal_schemas = determine_personal_schemas(spec)
+    personal_schemas = [ps.qualified_name for ps in determine_personal_schemas(spec)]
     schema_owners = determine_schema_owners(spec)
 
     # At a minimum, the schema owner could conceivably create objects
@@ -143,7 +147,8 @@ def determine_schema_writers(spec):
 
     for role, config in spec.items():
         try:
-            writable_schemas = set(config['privileges']['schemas']['write']) if config else set()
+            writable_schemas_objnames = set(config['privileges']['schemas']['write']) if config else set()
+            writable_schemas = set([i.qualified_name for i in writable_schemas_objnames])
         except KeyError:
             writable_schemas = set()
 
@@ -186,13 +191,7 @@ class PrivilegeAnalyzer(object):
         self.default_acl_possible = self.object_kind in OBJECTS_WITH_DEFAULTS
 
         self.current_defaults = dbcontext.get_role_current_defaults(rolename, object_kind, access)
-
-        # TODO: Use the ObjectName instance instead of it's qualified_name
-        current_nondefault_objects = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
-        if current_nondefault_objects:
-            self.current_nondefaults = set([(objname.qualified_name, priv) for objname, priv in current_nondefault_objects])
-        else:
-            self.current_nondefaults = set()
+        self.current_nondefaults = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
 
         self.all_object_attrs = dbcontext.get_all_object_attributes()
 
@@ -224,14 +223,14 @@ class PrivilegeAnalyzer(object):
         nondefaults_to_grant = self.desired_nondefaults.difference(self.current_nondefaults)
         logger.debug('nondefaults_to_grant: {}'.format(nondefaults_to_grant))
         if nondefaults_to_grant:
-            for objname_as_str, pg_priv_kind in sorted(nondefaults_to_grant):
-                self.grant_nondefault(objname_as_str, pg_priv_kind)
+            for objname, pg_priv_kind in sorted(nondefaults_to_grant):
+                self.grant_nondefault(objname.qualified_name, pg_priv_kind)
 
         nondefaults_to_revoke = self.current_nondefaults.difference(self.desired_nondefaults)
         logger.debug('nondefaults_to_revoke: {}'.format(nondefaults_to_revoke))
         if nondefaults_to_revoke:
-            for objname_as_str, pg_priv_kind in sorted(nondefaults_to_revoke):
-                self.revoke_nondefault(objname_as_str, pg_priv_kind)
+            for objname, pg_priv_kind in sorted(nondefaults_to_revoke):
+                self.revoke_nondefault(objname.qualified_name, pg_priv_kind)
 
     def determine_desired_defaults(self, schemas):
         """ For any given schema, we want to grant default privileges to this role from each role
@@ -246,26 +245,23 @@ class PrivilegeAnalyzer(object):
                 for pg_priv_kind in PRIVILEGE_MAP[self.object_kind][self.access]:
                     self.desired_defaults.add(tuple([writer, schema, pg_priv_kind]))
 
-    def get_object_owner(self, item, objkind=None):
+    def get_object_owner(self, objname, objkind=None):
         objkind = objkind or self.object_kind
-        objname = common.ObjectName.from_str(item)
         object_owners = self.all_object_attrs.get(objkind, dict()).get(objname.schema, dict())
         owner = object_owners.get(objname, dict()).get('owner', None)
         if owner:
             return owner
         else:
             obj_kind_singular = objkind[:-1]
-            common.fail(OBJECT_DOES_NOT_EXIST_ERROR_MSG.format(obj_kind_singular, item,
+            common.fail(OBJECT_DOES_NOT_EXIST_ERROR_MSG.format(obj_kind_singular,
+                                                               objname.qualified_name,
                                                                self.rolename))
 
     def get_schema_objects(self, schema):
         """ Get all objects of kind self.object_kind which are in the given schema and not owned by
         self.rolename """
         object_owners = self.all_object_attrs.get(self.object_kind, dict()).get(schema, dict())
-        return {objname.qualified_name for objname, attr in object_owners.items() if attr['owner'] != self.rolename}
-
-    def get_schema_owner(self, schema):
-        return self.get_object_owner(schema, objkind='schemas')
+        return {objname for objname, attr in object_owners.items() if attr['owner'] != self.rolename}
 
     def grant_default(self, grantor, schema, privilege):
         query = Q_GRANT_DEFAULT.format(grantor, schema, privilege, self.object_kind.upper(), self.rolename)
@@ -281,7 +277,7 @@ class PrivilegeAnalyzer(object):
         Create the sets of desired privileges. The sets will look like the following:
 
             self.desired_nondefaults:
-                {(objname_as_str, priv_name), ...}
+                {(ObjectName(schema, unqualified_name), priv_name), ...}
                 Example: {('myschema.mytable', 'SELECT'), ...}
 
             self.desired_defaults:
@@ -290,23 +286,22 @@ class PrivilegeAnalyzer(object):
         """
         desired_nondefault_objs = set()
         schemas = []
-        for item in self.desired_items:
-            if item == 'personal_schemas' and self.object_kind == 'schemas':
+        for objname in self.desired_items:
+            if objname.qualified_name == 'personal_schemas' and self.object_kind == 'schemas':
                 desired_nondefault_objs.update(self.personal_schemas)
-            elif item == 'personal_schemas' and self.object_kind != 'schemas':
+            elif objname.qualified_name == 'personal_schemas' and self.object_kind != 'schemas':
                 # The end-user is asking something impossible
                 common.fail(PERSONAL_SCHEMAS_ERROR_MSG.format(self.rolename, self.object_kind, self.access))
-            elif item == 'personal_schemas.*':
-                schemas.extend(list(self.personal_schemas))
-            elif not item.endswith('.*'):
+            elif objname.qualified_name == 'personal_schemas.*':
+                schemas.extend([ps.qualified_name for ps in self.personal_schemas])
+            elif objname.unqualified_name != '*':
                 # This is a single non-default privilege ask
-                quoted_item = common.ensure_quoted_identifier(item)
-                owner = self.get_object_owner(quoted_item)
+                owner = self.get_object_owner(objname)
                 if owner != self.rolename:
-                    desired_nondefault_objs.add(quoted_item)
+                    desired_nondefault_objs.add(objname)
             else:
                 # We were given a schema.*; we'll process those below
-                schemas.append(item[:-2])
+                schemas.append(objname.schema)
 
         for schema in schemas:
             # For schemas, we wish to have privileges for all existing objects, so get all

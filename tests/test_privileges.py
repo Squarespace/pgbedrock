@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from conftest import quoted_object, run_setup_sql
-from pgbedrock import privileges as privs, attributes, ownerships
+from pgbedrock import privileges as privs, attributes, ownerships, spec_inspector
 from pgbedrock.common import ObjectName
 
 
@@ -111,7 +111,7 @@ def test_analyze_privileges(cursor):
                     - schema1
                     - schema2
     """
-    desired_spec = yaml.load("""
+    unconverted_desired_spec = yaml.load("""
         {role0}:
             privileges:
                 tables:
@@ -139,6 +139,7 @@ def test_analyze_privileges(cursor):
                     - {schema2}
     """.format(role0=ROLES[0], role1=ROLES[1], role2=ROLES[2], role3=ROLES[3], schema0=SCHEMAS[0],
                schema1=SCHEMAS[1], schema2=SCHEMAS[2], sequence1=SEQUENCES[1], table2=TABLES[2]))
+    desired_spec = spec_inspector.convert_spec_to_objectnames(unconverted_desired_spec)
 
     expected_role0_changes = set([
         # Revoke read schema2.table5 from role0
@@ -250,7 +251,7 @@ def test_get_schema_objects_tables(mockdbcontext):
 
     # Assert that we get back the tables that are in the context object
     actual = privconf.get_schema_objects(SCHEMAS[0])
-    expected = set([quoted_object(SCHEMAS[0], t) for t in TABLES])
+    expected = set([ObjectName(SCHEMAS[0], t) for t in TABLES])
     assert actual == expected
 
 
@@ -270,16 +271,16 @@ def test_get_schema_objects_sequences(mockdbcontext):
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
     # Assert that we get back the sequences that are in the context object
     actual = privconf.get_schema_objects(SCHEMAS[0])
-    expected = set([quoted_object(SCHEMAS[0], seq) for seq in SEQUENCES])
+    expected = set([ObjectName(SCHEMAS[0], seq) for seq in SEQUENCES])
     assert actual == expected
 
 
-@pytest.mark.parametrize('object_kind, item, expected', [
-    ('schemas', SCHEMAS[0], ROLES[0]),
-    ('sequences', quoted_object(SCHEMAS[0], SEQUENCES[0]), ROLES[1]),
-    ('tables', quoted_object(SCHEMAS[0], TABLES[1]), ROLES[2]),
+@pytest.mark.parametrize('object_kind, objname, expected', [
+    ('schemas', ObjectName(SCHEMAS[0]), ROLES[0]),
+    ('sequences', ObjectName(SCHEMAS[0], SEQUENCES[0]), ROLES[1]),
+    ('tables', ObjectName(SCHEMAS[0], TABLES[1]), ROLES[2]),
 ])
-def test_get_object_owner(mockdbcontext, object_kind, item, expected):
+def test_get_object_owner(mockdbcontext, object_kind, objname, expected):
     mockdbcontext.get_all_object_attributes = lambda: {
         'schemas': {
             SCHEMAS[0]: {
@@ -299,37 +300,24 @@ def test_get_object_owner(mockdbcontext, object_kind, item, expected):
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
-    actual = privconf.get_object_owner(item)
+    actual = privconf.get_object_owner(objname)
     assert actual == expected
 
 
 def test_get_object_owner_nonexistent_object(capsys, mockdbcontext):
     object_kind = 'tables'
-    item = 'foo.bar'
+    objname = ObjectName('foo', 'bar')
     mockdbcontext.get_all_object_attributes = lambda: {}
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access=DUMMY, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
 
     with pytest.raises(SystemExit):
-        privconf.get_object_owner(item)
+        privconf.get_object_owner(objname)
 
     out, _ = capsys.readouterr()
-    assert out == privs.OBJECT_DOES_NOT_EXIST_ERROR_MSG.format('table', item, ROLES[0]) + '\n'
-
-
-def test_get_schema_owner(mockdbcontext):
-    mockdbcontext.get_all_object_attributes = lambda: {
-        'schemas': {
-            SCHEMAS[0]: {
-                ObjectName(SCHEMAS[0]): {'owner': ROLES[1], 'is_dependent': False},
-            },
-        },
-    }
-    privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind=DUMMY,
-                                       desired_items=DUMMY, schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext)
-    assert privconf.get_schema_owner(SCHEMAS[0]) == ROLES[1]
+    assert out == privs.OBJECT_DOES_NOT_EXIST_ERROR_MSG.format('table', objname.qualified_name,
+                                                               ROLES[0]) + '\n'
 
 
 def test_determine_desired_defaults(mockdbcontext):
@@ -389,9 +377,9 @@ def test_identify_desired_objects(rolename, mockdbcontext):
     }
 
     desired_items = [
-        '{}.*'.format(SCHEMAS[0]),
-        '{}.{}'.format(SCHEMAS[1], SEQUENCES[0]),
-        '{}.{}'.format(SCHEMAS[1], SEQUENCES[1])
+        ObjectName(SCHEMAS[0], '*'),
+        ObjectName(SCHEMAS[1], SEQUENCES[0]),
+        ObjectName(SCHEMAS[1], SEQUENCES[1])
     ]
 
     schema_writers = {SCHEMAS[0]: set(ROLES[:3])}
@@ -414,17 +402,17 @@ def test_identify_desired_objects(rolename, mockdbcontext):
     actual_defaults = privconf.desired_defaults
     assert actual_defaults == expected_defaults
 
-    nondefault_items = [quoted_object(SCHEMAS[0], t) for t in SEQUENCES[0:3]] \
-                     + [quoted_object(SCHEMAS[1], t) for t in SEQUENCES[:2]]
+    nondefault_items = [ObjectName(SCHEMAS[0], t) for t in SEQUENCES[0:3]] \
+                     + [ObjectName(SCHEMAS[1], t) for t in SEQUENCES[:2]]
 
     # Remove things owned by the given role
     if rolename == ROLES[1]:
-        nondefault_items.remove(quoted_object(SCHEMAS[0], SEQUENCES[0]))
-        nondefault_items.remove(quoted_object(SCHEMAS[1], SEQUENCES[1]))
+        nondefault_items.remove(ObjectName(SCHEMAS[0], SEQUENCES[0]))
+        nondefault_items.remove(ObjectName(SCHEMAS[1], SEQUENCES[1]))
     elif rolename == ROLES[2]:
-        nondefault_items.remove(quoted_object(SCHEMAS[0], SEQUENCES[1]))
-        nondefault_items.remove(quoted_object(SCHEMAS[0], SEQUENCES[2]))
-        nondefault_items.remove(quoted_object(SCHEMAS[1], SEQUENCES[0]))
+        nondefault_items.remove(ObjectName(SCHEMAS[0], SEQUENCES[1]))
+        nondefault_items.remove(ObjectName(SCHEMAS[0], SEQUENCES[2]))
+        nondefault_items.remove(ObjectName(SCHEMAS[1], SEQUENCES[0]))
 
     expected_nondefaults = set(itertools.product(nondefault_items, possible_privs))
     actual_nondefaults = privconf.desired_nondefaults
@@ -440,16 +428,21 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_schema(mockdbc
             SCHEMAS[1]: {ObjectName(SCHEMAS[1]): {'owner': ROLES[0]}, 'is_dependent': False},
         },
     }
-    personal_schemas = ROLES[1:3]
+    personal_schemas = set([
+        ObjectName(ROLES[1]),
+        ObjectName(ROLES[2]),
+        ObjectName(ROLES[3]),
+    ])
     access = 'read'
     object_kind = 'schemas'
-    desired_items = list(SCHEMAS[:2]) + ['personal_schemas']
+    desired_items = [ObjectName(SCHEMAS[0]), ObjectName(SCHEMAS[1]), ObjectName('personal_schemas')]
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=access, object_kind=object_kind,
                                        desired_items=desired_items, schema_writers=DUMMY,
                                        personal_schemas=personal_schemas, dbcontext=mockdbcontext)
     privconf.identify_desired_objects()
 
-    expected_schemas = set(SCHEMAS[:2] + personal_schemas)
+    nonpersonal_expected_schemas = set([ObjectName(SCHEMAS[0]), ObjectName(SCHEMAS[1])])
+    expected_schemas = nonpersonal_expected_schemas.union(personal_schemas)
     possible_privs = privs.PRIVILEGE_MAP[object_kind][access]
     expected = set(itertools.product(expected_schemas, possible_privs))
     actual = set(privconf.desired_nondefaults)
@@ -485,12 +478,12 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_not_schema(moc
             },
         },
     }
-    personal_schemas = ROLES[2:4]
+    personal_schemas = set([ObjectName(ROLES[2]), ObjectName(ROLES[3])])
     access = 'read'
     object_kind = 'tables'
     desired_items = [
-        '{}.{}'.format(SCHEMAS[0], TABLES[0]),
-        'personal_schemas.*'
+        ObjectName(SCHEMAS[0], TABLES[0]),
+        ObjectName('personal_schemas', '*')
     ]
     schema_writers = {
         ROLES[2]: set([ROLES[2], ROLES[1]]),
@@ -513,11 +506,11 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_not_schema(moc
 
     # Check non-default privileges
     expected_nondefault_items = [
-        quoted_object(SCHEMAS[0], TABLES[0]),
-        quoted_object(ROLES[2], TABLES[2]),
-        quoted_object(ROLES[2], TABLES[3]),
-        quoted_object(ROLES[3], TABLES[4]),
-        quoted_object(ROLES[3], TABLES[5]),
+        ObjectName(SCHEMAS[0], TABLES[0]),
+        ObjectName(ROLES[2], TABLES[2]),
+        ObjectName(ROLES[2], TABLES[3]),
+        ObjectName(ROLES[3], TABLES[4]),
+        ObjectName(ROLES[3], TABLES[5]),
     ]
     expected_nondefaults = set(itertools.product(expected_nondefault_items, possible_privs))
     actual_nondefaults = privconf.desired_nondefaults
@@ -530,8 +523,9 @@ def test_identify_desired_objects_personal_schemas_error_expected(capsys, mockdb
     access = 'read'
     object_kind = 'tables'
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=access, object_kind=object_kind,
-                                       desired_items=['personal_schemas'], schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext)
+                                       desired_items=[ObjectName('personal_schemas')],
+                                       schema_writers=DUMMY, personal_schemas=DUMMY,
+                                       dbcontext=mockdbcontext)
     with pytest.raises(SystemExit):
         privconf.identify_desired_objects()
     expected_err_msg = privs.PERSONAL_SCHEMAS_ERROR_MSG.format(DUMMY, object_kind, access) + '\n'
@@ -611,7 +605,7 @@ def test_analyze_defaults(mockdbcontext):
         },
     }
 
-    desired_items = ['{}.*'.format(SCHEMAS[0])]
+    desired_items = [ObjectName(SCHEMAS[0], '*')]
     schema_writers = {
         SCHEMAS[0]: set([ROLES[1], ROLES[2]]),
     }
@@ -671,8 +665,8 @@ def test_analyze_nondefaults(mockdbcontext):
         }
     }
     desired_items = [
-        '{}.*'.format(SCHEMAS[0]),
-        '{}.{}'.format(SCHEMAS[1], TABLES[2])
+        ObjectName(SCHEMAS[0], '*'),
+        ObjectName(SCHEMAS[1], TABLES[2]),
     ]
     dummy_schema_writers = defaultdict(set)
 
@@ -730,7 +724,7 @@ def test_determine_personal_schemas():
         'roleE': {},
         'roleF': None,
     }
-    expected = set(['roleA', 'roleB'])
+    expected = set([ObjectName('roleA'), ObjectName('roleB')])
     actual = privs.determine_personal_schemas(spec)
     assert actual == expected
 
@@ -740,14 +734,14 @@ def test_determine_schema_owners():
         'roleA': {
             'has_personal_schema': True,
             'owns': {
-                'schemas': ['schema1', 'schema2'],
+                'schemas': [ObjectName('schema1'), ObjectName('schema2')],
             },
         },
         'roleB': {'has_personal_schema': 'yes'},
         'roleC': {
             'has_personal_schema': 'false',
             'owns': {
-                'schemas': ['schema3'],
+                'schemas': [ObjectName('schema3')],
             },
         },
         'roleD': {'has_personal_schema': False},
@@ -785,21 +779,21 @@ def test_determine_schema_writers():
             'has_personal_schema': True,
             'is_superuser': 'false',
             'owns': {
-                'schemas': ['schema1', 'schema2'],
+                'schemas': [ObjectName('schema1'), ObjectName('schema2')],
             },
         },
         'roleB': {
             'has_personal_schema': 'yes',
             'privileges': {
                 'schemas': {
-                    'write': ['personal_schemas', 'schema3'],
+                    'write': [ObjectName('personal_schemas'), ObjectName('schema3')],
                 },
             },
         },
         'roleC': {
             'has_personal_schema': 'false',
             'owns': {
-                'schemas': ['schema3'],
+                'schemas': [ObjectName('schema3')],
             },
         },
         'roleD': {'has_personal_schema': False},

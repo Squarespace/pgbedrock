@@ -25,12 +25,12 @@ def test_analyze_ownerships_create_schemas(cursor):
         ROLES[0]: {
             'has_personal_schema': True,
             'owns': {
-                'schemas': [SCHEMAS[0]]
+                'schemas': [ObjectName(SCHEMAS[0])]
             },
         },
         ROLES[1]: {
             'owns': {
-                'schemas': [SCHEMAS[1]],
+                'schemas': [ObjectName(SCHEMAS[1])],
             },
         },
     }
@@ -67,14 +67,14 @@ def test_analyze_ownerships_nonschemas(cursor):
     spec = {
         ROLES[0]: {
             'owns': {
-                'tables': ['{}.*'.format(SCHEMAS[0])]
+                'tables': [ObjectName(SCHEMAS[0], '*')]
             },
         },
         ROLES[1]: {
             'owns': {
                 'sequences': [
-                    quoted_object(SCHEMAS[1], SEQUENCES[0]),
-                    quoted_object(SCHEMAS[1], SEQUENCES[1]),
+                    ObjectName(SCHEMAS[1], SEQUENCES[0]),
+                    ObjectName(SCHEMAS[1], SEQUENCES[1]),
                 ]
             },
         },
@@ -120,15 +120,15 @@ def test_analyze_ownerships_schemas_and_nonschemas(cursor):
         ROLES[0]: {
             'has_personal_schema': True,
             'owns': {
-                'tables': ['{}.*'.format(SCHEMAS[0])],
-                'schemas': [SCHEMAS[2]],
+                'tables': [ObjectName(SCHEMAS[0], '*')],
+                'schemas': [ObjectName(SCHEMAS[2])],
             },
         },
         ROLES[1]: {
             'owns': {
                 'sequences': [
-                    quoted_object(SCHEMAS[1], SEQUENCES[0]),
-                    quoted_object(SCHEMAS[1], SEQUENCES[1]),
+                    ObjectName(SCHEMAS[1], SEQUENCES[0]),
+                    ObjectName(SCHEMAS[1], SEQUENCES[1]),
                 ]
             },
         },

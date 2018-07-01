@@ -107,7 +107,6 @@ class ObjectName(object):
         if self._unqualified_name and self._unqualified_name == '*':
             self._qualified_name = '{}.{}'.format(self.schema, self.unqualified_name)
         elif self._unqualified_name and self._unqualified_name != '*':
-            #TODO: Change these to "schema"."table" after converting pgbedrock to use this class
             # Note that if we decide to support "schema"."table" within YAML that we'll need to
             # add a custom constructor since otherwise YAML gets confused unless you do
             # '"schema"."table"'
@@ -139,10 +138,6 @@ class ObjectName(object):
         stripped, but note that we don't do anything with impossible input like 'foo."bar".baz'
         (which is impossible because the object name would include double quotes in it). Instead,
         we let processing proceed and the issue bubble up downstream.
-
-        #TODO: add spec validation to prevent things like the impossible situation above, then
-        amend this docstring to note that.
-
         """
         if '.' not in text:
             return cls(schema=text)
@@ -152,6 +147,10 @@ class ObjectName(object):
         schema, unqualified_name = text.split('.', 1)
         # Don't worry about removing double quotes as that happens in __init__
         return cls(schema=schema, unqualified_name=unqualified_name)
+
+    def only_schema(self):
+        """ Return an ObjectName instance for the schema associated with the current object """
+        return ObjectName(self.schema)
 
     @property
     def schema(self):
