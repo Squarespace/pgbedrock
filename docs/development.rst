@@ -19,6 +19,14 @@ First, get your Python environment set up:
     mkvirtualenv pgbedrock3 --python python3
     pip3 install -e . -r requirements-dev.txt
 
+Note that if the pip install step fails on psycopg2 you may have to do the following:
+
+    * ``brew install postgresql openssl``
+    * ``xcode-select --install``, followed by a restart of your machine
+    * If you still get an error about a library for -lssl not found, then you have two options: ``brew reinstall python`` to get Python to use brew's OpenSSL, or explicitly tell pip to use Brew's OpenSSL via ``LDFLAGS="-L$(brew --prefix openssl)/lib" pip3 install psycopg2``.
+
+Testing Functionality
+---------------------
 Various testing functionality exists:
 
     * ``make test`` - Run tests for both Python 2 and 3 (via docker containers) against all
