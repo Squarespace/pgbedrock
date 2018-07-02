@@ -328,7 +328,7 @@ def test_determine_desired_defaults(mockdbcontext):
     # Using sequence-write because it has 2 types of privileges (i.e. >1 but not a ton)
     object_kind = 'sequences'
     access = 'write'
-    schema_writers = {SCHEMAS[0]: set(ROLES[1:])}
+    schema_writers = {ObjectName(SCHEMAS[0]): set(ROLES[1:])}
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access=access, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=schema_writers,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
@@ -382,7 +382,7 @@ def test_identify_desired_objects(rolename, mockdbcontext):
         ObjectName(SCHEMAS[1], SEQUENCES[1])
     ]
 
-    schema_writers = {SCHEMAS[0]: set(ROLES[:3])}
+    schema_writers = {ObjectName(SCHEMAS[0]): set(ROLES[:3])}
 
     privconf = privs.PrivilegeAnalyzer(rolename, access=access, object_kind=object_kind,
                                        desired_items=desired_items, schema_writers=schema_writers,
@@ -486,8 +486,8 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_not_schema(moc
         ObjectName('personal_schemas', '*')
     ]
     schema_writers = {
-        ROLES[2]: set([ROLES[2], ROLES[1]]),
-        ROLES[3]: set([ROLES[3]]),
+        ObjectName(ROLES[2]): set([ROLES[2], ROLES[1]]),
+        ObjectName(ROLES[3]): set([ROLES[3]]),
     }
     privconf = privs.PrivilegeAnalyzer(ROLES[0], access=access, object_kind=object_kind,
                                        desired_items=desired_items, schema_writers=schema_writers,
@@ -607,7 +607,7 @@ def test_analyze_defaults(mockdbcontext):
 
     desired_items = [ObjectName(SCHEMAS[0], '*')]
     schema_writers = {
-        SCHEMAS[0]: set([ROLES[1], ROLES[2]]),
+        ObjectName(SCHEMAS[0]): set([ROLES[1], ROLES[2]]),
     }
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access='read', object_kind='tables',
                                        desired_items=desired_items, schema_writers=schema_writers,
@@ -749,11 +749,11 @@ def test_determine_schema_owners():
         'roleF': None,
     }
     expected = {
-        'roleA': 'roleA',
-        'roleB': 'roleB',
-        'schema1': 'roleA',
-        'schema2': 'roleA',
-        'schema3': 'roleC',
+        ObjectName('roleA'): 'roleA',
+        ObjectName('roleB'): 'roleB',
+        ObjectName('schema1'): 'roleA',
+        ObjectName('schema2'): 'roleA',
+        ObjectName('schema3'): 'roleC',
     }
     actual = privs.determine_schema_owners(spec)
     assert actual == expected
@@ -803,11 +803,11 @@ def test_determine_schema_writers():
         'roleH': {'is_superuser': 'true'},
     }
     expected = {
-        'roleA': set(['roleA', 'roleG', 'roleH', 'roleB']),
-        'roleB': set(['roleB', 'roleG', 'roleH']),
-        'schema1': set(['roleA', 'roleG', 'roleH']),
-        'schema2': set(['roleA', 'roleG', 'roleH']),
-        'schema3': set(['roleC', 'roleG', 'roleH', 'roleB']),
+        ObjectName('roleA'): set(['roleA', 'roleG', 'roleH', 'roleB']),
+        ObjectName('roleB'): set(['roleB', 'roleG', 'roleH']),
+        ObjectName('schema1'): set(['roleA', 'roleG', 'roleH']),
+        ObjectName('schema2'): set(['roleA', 'roleG', 'roleH']),
+        ObjectName('schema3'): set(['roleC', 'roleG', 'roleH', 'roleB']),
     }
     actual = privs.determine_schema_writers(spec)
     assert actual == expected

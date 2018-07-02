@@ -93,6 +93,10 @@ def get_members(group, spec):
 
 
 def determine_personal_schemas(spec):
+    """
+    Returns:
+        set: A set of ObjectName instances of personal schemas
+    """
     personal_schemas = set()
     for role, config in spec.items():
         if config and common.parse_bool(config.get('has_personal_schema', False)):
@@ -102,7 +106,7 @@ def determine_personal_schemas(spec):
 
 
 def determine_schema_owners(spec):
-    ''' Create a dict of {schema: owner} '''
+    """ Create a dict of {ObjectName(schema): owner} """
     schema_owners = dict()
     for role, config in spec.items():
         if not config:
@@ -111,10 +115,10 @@ def determine_schema_owners(spec):
         if 'owns' in config:
             owned_schemas = config['owns'].get('schemas', ())
             for schema in owned_schemas:
-                schema_owners[schema.qualified_name] = role
+                schema_owners[schema] = role
 
         if common.parse_bool(config.get('has_personal_schema', False)):
-            schema_owners[role] = role
+            schema_owners[common.ObjectName(role)] = role
 
     return schema_owners
 
@@ -136,10 +140,11 @@ def determine_schema_writers(spec):
     Create a dict mapping from each schema to all roles that can create objects in that
     schema, i.e.:
 
-        {schema_as_str: [roleA, roleB, roleC], ...}
+    Returns:
+        dict: A dict of the form {common.ObjectName(schema): [roleA, roleB, roleC], ...}
     """
     members_of_role = determine_role_members(spec)
-    personal_schemas = [ps.qualified_name for ps in determine_personal_schemas(spec)]
+    personal_schemas = determine_personal_schemas(spec)
     schema_owners = determine_schema_owners(spec)
 
     # At a minimum, the schema owner could conceivably create objects
@@ -147,13 +152,12 @@ def determine_schema_writers(spec):
 
     for role, config in spec.items():
         try:
-            writable_schemas_objnames = set(config['privileges']['schemas']['write']) if config else set()
-            writable_schemas = set([i.qualified_name for i in writable_schemas_objnames])
+            writable_schemas = set(config['privileges']['schemas']['write']) if config else set()
         except KeyError:
             writable_schemas = set()
 
-        if 'personal_schemas' in writable_schemas:
-            writable_schemas.remove('personal_schemas')
+        if common.ObjectName('personal_schemas') in writable_schemas:
+            writable_schemas.remove(common.ObjectName('personal_schemas'))
             writable_schemas.update(personal_schemas)
 
         for schema in writable_schemas:
@@ -237,7 +241,8 @@ class PrivilegeAnalyzer(object):
         that can write in that schema. We cross this against all privilege types. """
         self.desired_defaults = set()
         for schema in schemas:
-            writers = self.schema_writers[schema]
+            #TODO: Remove this ObjectName casting
+            writers = self.schema_writers[common.ObjectName(schema)]
             for writer in writers:
                 # We don't need to grant default privileges for things this role will create
                 if writer == self.rolename:
