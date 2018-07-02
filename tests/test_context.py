@@ -78,13 +78,13 @@ def test_get_role_current_defaults(rolename, object_kind, access, expected):
 
 @pytest.mark.parametrize('rolename, schema, object_kind, access, expected', [
     # No privilege --> false
-    ('role1', 'schema1', 'tables', 'read', False),
+    ('role1', common.ObjectName('schema1'), 'tables', 'read', False),
     # Privilege exists --> True
-    ('role1', 'schema1', 'tables', 'write', True),
+    ('role1', common.ObjectName('schema1'), 'tables', 'write', True),
     # Grantor is this role --> False
-    ('role1', 'schema2', 'tables', 'read', False),
+    ('role1', common.ObjectName('schema2'), 'tables', 'read', False),
     # No entries exist --> False
-    ('role1', DUMMY, 'objkind_does_not_exist', DUMMY, False),
+    ('role1', common.ObjectName(DUMMY), 'objkind_does_not_exist', DUMMY, False),
 ])
 def test_has_default_privilege(rolename, schema, object_kind, access, expected):
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=True)

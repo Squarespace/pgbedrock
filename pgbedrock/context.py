@@ -335,12 +335,11 @@ class DatabaseContext(object):
             return set()
 
     def has_default_privilege(self, rolename, schema, object_kind, access):
-        #TODO: Convert this to use ObjectName instances
         write_defaults = self.get_role_current_defaults(rolename, object_kind, access)
         for grantor, objname, priv in write_defaults:
             # So long as at least one default privilege exists in this schema and was not granted
             # by this role we consider the role to have default privileges in that schema
-            if objname.qualified_name == schema and grantor != rolename:
+            if objname == schema and grantor != rolename:
                 return True
 
         return False
