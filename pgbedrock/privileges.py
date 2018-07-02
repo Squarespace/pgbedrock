@@ -298,12 +298,12 @@ class PrivilegeAnalyzer(object):
         desired_nondefault_objs = set()
         schemas = []
         for objname in self.desired_items:
-            if objname.qualified_name == 'personal_schemas' and self.object_kind == 'schemas':
+            if objname == common.ObjectName('personal_schemas') and self.object_kind == 'schemas':
                 desired_nondefault_objs.update(self.personal_schemas)
-            elif objname.qualified_name == 'personal_schemas' and self.object_kind != 'schemas':
+            elif objname == common.ObjectName('personal_schemas') and self.object_kind != 'schemas':
                 # The end-user is asking something impossible
                 common.fail(PERSONAL_SCHEMAS_ERROR_MSG.format(self.rolename, self.object_kind, self.access))
-            elif objname.qualified_name == 'personal_schemas.*':
+            elif objname == common.ObjectName('personal_schemas', '*'):
                 schemas.extend(self.personal_schemas)
             elif objname.unqualified_name != '*':
                 # This is a single non-default privilege ask
