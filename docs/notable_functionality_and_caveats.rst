@@ -1,8 +1,8 @@
 Notable Functionality And Caveats
 =================================
 
-* Only Postgres 9.5. and 9.6 are currently supported
-    Postgres 10 anecdotally appears to work as well but is not yet explicitly supported.
+* Only Postgres 9.5, 9.6, and 10 are currently supported
+    Support for older Postgres versions is unlikely to be prioritized.
 
 * pgbedrock will not delete or alter any objects
     pgbedrock is explicitly written to not do anything destructive toward the objects in the
