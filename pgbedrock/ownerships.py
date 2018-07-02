@@ -165,9 +165,10 @@ class SchemaAnalyzer(object):
         self.sql_to_run.append(query)
 
     def create_schema(self):
-        query = Q_CREATE_SCHEMA.format(self.objname.schema, self.rolename)
+        query = Q_CREATE_SCHEMA.format(self.objname.qualified_name, self.rolename)
         self.sql_to_run.append(query)
 
     def set_owner(self):
-        query = Q_SET_SCHEMA_OWNER.format(self.objname.schema, self.rolename, self.current_owner)
+        query = Q_SET_SCHEMA_OWNER.format(self.objname.qualified_name,
+                                          self.rolename, self.current_owner)
         self.sql_to_run.append(query)
