@@ -28,15 +28,16 @@ def analyze_ownerships(spec, cursor, verbose):
                 continue
 
             if config.get('has_personal_schema'):
-                sql_to_run = SchemaAnalyzer(rolename=rolename, schema=rolename,
+                objname = common.ObjectName.from_str(rolename)
+                sql_to_run = SchemaAnalyzer(rolename=rolename, objname=objname,
                                             dbcontext=dbcontext, is_personal_schema=True).analyze()
                 all_sql_to_run += sql_to_run
 
             ownerships = config.get('owns', {})
             for objkind, objects_to_own in ownerships.items():
                 if objkind == 'schemas':
-                    for schema in objects_to_own:
-                        sql_to_run = SchemaAnalyzer(rolename=rolename, schema=schema,
+                    for objname in objects_to_own:
+                        sql_to_run = SchemaAnalyzer(rolename=rolename, objname=objname,
                                                     dbcontext=dbcontext,
                                                     is_personal_schema=False).analyze()
                         all_sql_to_run += sql_to_run
@@ -58,6 +59,18 @@ class NonschemaAnalyzer(object):
     in that schema will be verified and changed if necessary.
     """
     def __init__(self, rolename, objname, objkind, dbcontext):
+        """
+        Args:
+            rolename (str): The name of the role that should own the object(s)
+
+            objname (common.ObjectName): The object(s) to analyze
+
+            objkind (str): The type of object. This must be one of the keys of
+                context.PRIVILEGE_MAP, e.g. 'schemas', 'tables', etc.
+
+            dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
+                information for the associated database
+        """
         self.rolename = rolename
         self.objname = objname
         self.objkind = objkind
@@ -68,24 +81,22 @@ class NonschemaAnalyzer(object):
         """ Get all non-dependent objects of kind objkind within the specified schema """
         all_objkind_objects = self.dbcontext.get_all_object_attributes().get(self.objkind, dict())
         schema_objects = all_objkind_objects.get(schema, dict())
-        nondependent_objects = [name for name, attr in schema_objects.items() if not attr['is_dependent']]
+        nondependent_objects = [objname for objname, attr in schema_objects.items() if not attr['is_dependent']]
         return nondependent_objects
 
     def analyze(self):
-        schema = self.objname.split('.')[0]
-
-        if self.objname.endswith('.*'):
-            objects_to_manage = self.expand_schema_objects(schema)
+        if self.objname.unqualified_name == '*':
+            objects_to_manage = self.expand_schema_objects(self.objname.schema)
         else:
             objects_to_manage = [self.objname]
 
         all_object_attributes = self.dbcontext.get_all_object_attributes()
         for objname in objects_to_manage:
-            current_owner = all_object_attributes[self.objkind][schema][objname]['owner']
+            current_owner = all_object_attributes[self.objkind][self.objname.schema][objname]['owner']
             if current_owner != self.rolename:
                 obj_kind_singular = self.objkind.upper()[:-1]
-                query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname, self.rolename,
-                                                  current_owner)
+                query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname.qualified_name,
+                                                  self.rolename, current_owner)
                 self.sql_to_run.append(query)
 
         return self.sql_to_run
@@ -98,15 +109,26 @@ class SchemaAnalyzer(object):
     personal schema that all objects in it (and that we track, i.e. the keys to the privileges.py
     modules's PRIVILEGE_MAP) are owned by the correct schema owner
     """
-    def __init__(self, rolename, schema, dbcontext, is_personal_schema=False):
+    def __init__(self, rolename, objname, dbcontext, is_personal_schema=False):
+        """
+        Args:
+            rolename (str): The name of the role that should own the schema
+
+            objname (common.ObjectName): The schema to analyze
+
+            dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
+                information for the associated database
+
+            is_personal_schemas (bool): Whether this is a personal schema
+        """
         self.sql_to_run = []
         self.rolename = common.check_name(rolename)
         logger.debug('self.rolename set to {}'.format(self.rolename))
-        self.schema = schema
+        self.objname = objname
         self.is_personal_schema = is_personal_schema
 
-        self.current_owner = dbcontext.get_schema_owner(schema)
-        self.schema_objects = dbcontext.get_schema_objects(schema)
+        self.current_owner = dbcontext.get_schema_owner(self.objname)
+        self.schema_objects = dbcontext.get_schema_objects(self.objname)
         # If there is no owner then the schema must not exist yet
         self.exists = self.current_owner is not None
 
@@ -129,22 +151,24 @@ class SchemaAnalyzer(object):
         auto-dependent (i.e. a sequence that is linked to a table, in which case its ownership
         derives from that linked table). Note that we only look at objects supported by pgbedrock
         (i.e. tables and sequences). Each entry returned is a tuple of the form
-        (objkind, objname, current_owner) """
+        (objkind, common.ObjectName, current_owner) """
         objects = []
         for item in self.schema_objects:
             if item.owner != self.rolename and not item.is_dependent:
-                objects.append((item.kind, item.name, item.owner))
+                objects.append((item.kind, item.objname, item.owner))
         return objects
 
     def alter_object_owner(self, objkind, objname, prev_owner):
         obj_kind_singular = objkind.upper()[:-1]
-        query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname, self.rolename, prev_owner)
+        query = Q_SET_OBJECT_OWNER.format(obj_kind_singular, objname.qualified_name,
+                                          self.rolename, prev_owner)
         self.sql_to_run.append(query)
 
     def create_schema(self):
-        query = Q_CREATE_SCHEMA.format(self.schema, self.rolename)
+        query = Q_CREATE_SCHEMA.format(self.objname.qualified_name, self.rolename)
         self.sql_to_run.append(query)
 
     def set_owner(self):
-        query = Q_SET_SCHEMA_OWNER.format(self.schema, self.rolename, self.current_owner)
+        query = Q_SET_SCHEMA_OWNER.format(self.objname.qualified_name,
+                                          self.rolename, self.current_owner)
         self.sql_to_run.append(query)

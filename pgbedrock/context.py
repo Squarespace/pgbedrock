@@ -57,9 +57,8 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
                ('S', 'sequences')
     ), tables_and_sequences AS (
         SELECT
-            -- We have to wrap the table name in double quotes in case there's a dot, e.g.
-            -- jdoe.jdoe.bar (note: this is often a mistake on the table creator's part)
-            nsp.nspname || '."' || c.relname || '"' AS objname,
+            nsp.nspname AS schema,
+            c.relname AS unqualified_name,
             map.objkind,
             (aclexplode(c.relacl)).grantee AS grantee_oid,
             t_owner.rolname AS owner,
@@ -77,7 +76,8 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
             AND c.relacl IS NOT NULL
     ), schemas AS (
         SELECT
-             nsp.nspname AS objname,
+             nsp.nspname AS schema,
+             NULL::TEXT AS unqualified_name,
              'schemas'::TEXT AS objkind,
              (aclexplode(nsp.nspacl)).grantee AS grantee_oid,
              t_owner.rolname AS owner,
@@ -95,7 +95,8 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
     SELECT
         t_grantee.rolname AS grantee,
         combined.objkind,
-        combined.objname,
+        combined.schema,
+        combined.unqualified_name,
         combined.privilege_type
     FROM
         combined
@@ -147,7 +148,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         SELECT
             map.kind,
             nsp.nspname AS schema,
-            nsp.nspname || '."' || c.relname || '"' AS name,
+            c.relname AS unqualified_name,
             c.relowner AS owner_id,
             -- Auto-dependency means that a sequence is linked to a table. Ownership of
             -- that sequence automatically derives from the table's ownership
@@ -166,13 +167,13 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         GROUP BY
             map.kind,
             schema,
-            name,
+            unqualified_name,
             owner_id
     ), schemas AS (
         SELECT
             'schemas'::TEXT AS kind,
             nsp.nspname AS schema,
-            nsp.nspname AS name,
+            NULL::TEXT AS unqualified_name,
             nsp.nspowner AS owner_id,
             FALSE AS is_dependent
         FROM pg_namespace nsp
@@ -186,7 +187,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
     SELECT
         co.kind,
         co.schema,
-        co.name,
+        co.unqualified_name,
         t_owner.rolname AS owner,
         co.is_dependent
     FROM combined AS co
@@ -232,9 +233,9 @@ PRIVILEGE_MAP = {
          },
 }
 
-ObjectInfo = namedtuple('ObjectInfo', ['kind', 'name', 'owner', 'is_dependent'])
+ObjectInfo = namedtuple('ObjectInfo', ['kind', 'objname', 'owner', 'is_dependent'])
 ObjectAttributes = namedtuple('ObjectAttributes',
-                              ['kind', 'schema', 'name', 'owner', 'is_dependent'])
+                              ['kind', 'schema', 'objname', 'owner', 'is_dependent'])
 VersionInfo = namedtuple('VersionInfo', ['postgres_version', 'redshift_version', 'is_redshift'])
 
 
@@ -285,11 +286,11 @@ class DatabaseContext(object):
             {roleA: {
                 objkindA: {
                     'read': set([
-                        (grantor, nspname, privilege),
+                        (grantor, ObjectName(nspname), privilege),
                         ...
                         ]),
                     'write': set([
-                        (grantor, nspname, privilege),
+                        (grantor, ObjectName(nspname), privilege),
                         ...
                         ])
                     },
@@ -300,17 +301,17 @@ class DatabaseContext(object):
 
             This will not include privileges granted by this role to itself
         """
-        DefaultRow = namedtuple('DefaultRow',
-                                ['grantee', 'objkind', 'grantor', 'schema', 'privilege'])
+        NamedRow = namedtuple('NamedRow',
+                              ['grantee', 'objkind', 'grantor', 'schema', 'privilege'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_CURRENT_DEFAULTS)
 
         current_defaults = defaultdict(dict)
         for i in self.cursor.fetchall():
-            row = DefaultRow(*i)
+            row = NamedRow(*i)
             is_read_priv = row.privilege in PRIVILEGE_MAP[row.objkind]['read']
             access_key = 'read' if is_read_priv else 'write'
 
-            entry = (row.grantor, row.schema, row.privilege)
+            entry = (row.grantor, common.ObjectName(row.schema), row.privilege)
             role_defaults = current_defaults[row.grantee]
 
             # Create this role's dict substructure for the first entry we come across
@@ -335,23 +336,23 @@ class DatabaseContext(object):
 
     def has_default_privilege(self, rolename, schema, object_kind, access):
         write_defaults = self.get_role_current_defaults(rolename, object_kind, access)
-        for grantor, nspname, priv in write_defaults:
+        for grantor, objname, priv in write_defaults:
             # So long as at least one default privilege exists in this schema and was not granted
             # by this role we consider the role to have default privileges in that schema
-            if nspname == schema and grantor != rolename:
+            if objname == schema and grantor != rolename:
                 return True
 
         return False
 
     def get_role_objects_with_access(self, rolename, schema, object_kind, access):
         """ Return the set of objects in this schema which the given rolename has the
-        specified access for """
-        objects_with_access = self.get_role_current_nondefaults(rolename, object_kind, access)
+        specified access for
 
-        results = set()
-        for objname, _ in objects_with_access:
-            if objname.split('.', 1)[0] == schema:
-                results.add(objname)
+        Returns:
+            set: A set of common.ObjectName instances
+        """
+        objects_with_access = self.get_role_current_nondefaults(rolename, object_kind, access)
+        results = set([objname for objname, _ in objects_with_access if objname.only_schema() == schema])
         return results
 
     def get_all_current_nondefaults(self):
@@ -374,27 +375,27 @@ class DatabaseContext(object):
 
             This will not include privileges granted by this role to itself
         """
-        NonDefaultRow = namedtuple('NonDefaultRow',
-                                   ['grantee', 'objkind', 'objname', 'privilege'])
+        NamedRow = namedtuple('NamedRow',
+                              ['grantee', 'objkind', 'schema', 'unqualified_name', 'privilege'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_CURRENT_NONDEFAULTS)
         current_nondefaults = defaultdict(dict)
 
         for i in self.cursor.fetchall():
-            row = NonDefaultRow(*i)
+            row = NamedRow(*i)
             is_read_priv = row.privilege in PRIVILEGE_MAP[row.objkind]['read']
             access_key = 'read' if is_read_priv else 'write'
 
-            entry = (row.objname, row.privilege)
-            role_defaults = current_nondefaults[row.grantee]
-
+            role_nondefaults = current_nondefaults[row.grantee]
             # Create this role's dict substructure for the first entry we come across
-            if row.objkind not in role_defaults:
-                role_defaults[row.objkind] = {
+            if row.objkind not in role_nondefaults:
+                role_nondefaults[row.objkind] = {
                     'read': set(),
                     'write': set(),
                 }
 
-            role_defaults[row.objkind][access_key].add(entry)
+            objname = common.ObjectName(schema=row.schema, unqualified_name=row.unqualified_name)
+            entry = (objname, row.privilege)
+            role_nondefaults[row.objkind][access_key].add(entry)
 
         return current_nondefaults
 
@@ -402,7 +403,10 @@ class DatabaseContext(object):
         """ Return the current non-default privileges for a specific
         rolename x object_kind x access type, e.g. for role jdoe x tables x read.
 
-        Returns a set of tuples of the form set([(objname, privilege), ... ]) """
+        Returns:
+            set: A set of tuples consisting of a database object and a privilege
+                with types (common.ObjectName, str)
+        """
         all_current_nondefaults = self.get_all_current_nondefaults()
         try:
             return all_current_nondefaults[rolename][object_kind][access]
@@ -431,7 +435,13 @@ class DatabaseContext(object):
         important. Thus, this helper method is here to ensure that we only run this query once.
         """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
-        results = [ObjectAttributes(*row) for row in self.cursor.fetchall()]
+        results = []
+        NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'unqualified_name', 'owner', 'is_dependent'])
+        for i in self.cursor.fetchall():
+            row = NamedRow(*i)
+            objname = common.ObjectName(schema=row.schema, unqualified_name=row.unqualified_name)
+            entry = ObjectAttributes(row.kind, row.schema, objname, row.owner, row.is_dependent)
+            results.append(entry)
         return results
 
     def get_all_object_attributes(self):
@@ -464,8 +474,8 @@ class DatabaseContext(object):
             if row.schema not in objkind_owners:
                 objkind_owners[row.schema] = dict()
 
-            objkind_owners[row.schema][row.name] = {'owner': row.owner,
-                                                    'is_dependent': row.is_dependent}
+            objkind_owners[row.schema][row.objname] = {'owner': row.owner,
+                                                       'is_dependent': row.is_dependent}
 
         return all_object_owners
 
@@ -475,13 +485,26 @@ class DatabaseContext(object):
         return self.cursor.fetchall()
 
     def get_all_schemas_and_owners(self):
-        """ Return a dict of {schema_name: schema_owner} """
+        """
+        Returns:
+            dict: a dict of {schema_name: schema_owner}, where schema_name is a common.ObjectName
+        """
         all_object_owners = self.get_all_object_attributes()
         schemas_subdict = all_object_owners.get('schemas', {})
-        schema_owners = {k: v[k]['owner'] for k, v in schemas_subdict.items()}
+        schema_owners = dict()
+        for schema, attributes in schemas_subdict.items():
+            objname = common.ObjectName(schema)
+            schema_owners[objname] = attributes[objname]['owner']
         return schema_owners
 
     def get_schema_owner(self, schema):
+        """
+        Args:
+            schema (common.ObjectName): The schema to find the owner for
+
+        Returns:
+            str
+        """
         all_schemas_and_owners = self.get_all_schemas_and_owners()
         return all_schemas_and_owners.get(schema)
 
@@ -491,15 +514,19 @@ class DatabaseContext(object):
         return role_memberships
 
     def get_all_personal_schemas(self):
-        """ Return all personal schemas as a set """
+        """ Return all personal schemas
+
+        Returns:
+            set: A set of common.ObjectName instances
+        """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_PERSONAL_SCHEMAS)
-        personal_schemas = set([i[0] for i in self.cursor.fetchall()])
+        personal_schemas = set([common.ObjectName(schema=row[0]) for row in self.cursor.fetchall()])
         return personal_schemas
 
     def get_all_nonschema_objects_and_owners(self):
         """
         For all objkinds other than schemas return a dict of the form
-            {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
+            {common.ObjectName(schema_name): [(objkind, objname, objowner, is_dependent), ...]}
 
         This is primarily a helper for DatabaseContext.get_schema_objects so we have O(1)
         schema object lookups instead of needing to iterate through all objects every time
@@ -507,17 +534,36 @@ class DatabaseContext(object):
         schema_objects = defaultdict(list)
         for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
-                objinfo = ObjectInfo(row.kind, row.name, row.owner, row.is_dependent)
-                schema_objects[row.schema].append(objinfo)
+                objinfo = ObjectInfo(row.kind, row.objname, row.owner, row.is_dependent)
+                schema_objects[row.objname.only_schema()].append(objinfo)
 
         return schema_objects
 
     def get_schema_objects(self, schema):
+        """
+        Args:
+            schema (common.ObjectName): The schema to get object for
+
+        Returns:
+            list
+        """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
         return all_objects_and_owners.get(schema, [])
 
     def is_schema_empty(self, schema, object_kind):
-        """ Determine if the schema is empty with regard to the object kind specified """
+        """ Determine if the schema is empty with regard to the object kind specified
+
+        If there are no objects in the schema of kind object_kind but there are objects in the
+        schema of other kinds, this function will return True (i.e. the schema is empty of this
+        particular kind of object)
+
+        Args:
+            schema (common.ObjectName): The schema to check
+            object_kind (str): The object kind to look for
+
+        Returns:
+            bool
+        """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
         for obj in all_objects_and_owners.get(schema, []):
             if obj.kind == object_kind:

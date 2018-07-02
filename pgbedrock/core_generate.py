@@ -73,6 +73,9 @@ def add_schema_ownerships(spec, dbcontext):
     though, and ithe implication is that when `pgbedrock configure` is run, if there are any
     objects in that schema that are not owned by the schema owner they will have their ownership
     changed (to be the same as the schema owner).
+
+    Returns:
+        dict: The input spec with schema ownerships added
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     schemas_and_owners = dbcontext.get_all_schemas_and_owners()
@@ -101,6 +104,9 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
     Objects that are dependent on other objects are skipped as we cannot configure their ownership;
     their ownership is tied to the object they depend on. Additionally, objects in personal schemas
     are skipped as they are managed by ownerships.py as part of the personal schema ownership.
+
+    Returns:
+        dict: The input spec with nonschema ownerships added
     """
     personal_schemas = dbcontext.get_all_personal_schemas()
     all_objects_and_owners = dbcontext.get_all_object_attributes()
@@ -108,7 +114,7 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
 
     for schema, objects_and_attributes in objects_and_owners.items():
         # Skip objects in personal schemas; their ownership is already managed by ownerships.py
-        if schema in personal_schemas:
+        if common.ObjectName(schema=schema) in personal_schemas:
             continue
 
         all_owners = set()
@@ -125,7 +131,8 @@ def add_nonschema_ownerships(spec, dbcontext, objkind):
             elif objkind not in spec[owner]['owns']:
                 spec[owner]['owns'][objkind] = []
 
-            spec[owner]['owns'][objkind].append('{}.*'.format(schema))
+            objname = common.ObjectName(schema=schema, unqualified_name='*')
+            spec[owner]['owns'][objkind].append(objname)
 
             # Since all objects in this schema are owned by one role, we can skip the below
             continue
@@ -173,11 +180,11 @@ def add_privileges(spec, dbcontext):
 
                 if writes:
                     collapsed_writes = collapse_personal_schemas(role, writes, objkind, dbcontext)
-                    obj_privs['write'] = sorted(collapsed_writes)
+                    obj_privs['write'] = collapsed_writes
 
                 if reads:
                     collapsed_reads = collapse_personal_schemas(role, reads, objkind, dbcontext)
-                    obj_privs['read'] = sorted(collapsed_reads)
+                    obj_privs['read'] = collapsed_reads
 
                 if obj_privs:
                     role_privileges[objkind] = obj_privs
@@ -197,21 +204,27 @@ def collapse_personal_schemas(role, objects, objkind, dbcontext):
     Note that this role's personal schema (if it exists) will not show up here at all as
     determine_all_nonschema_privileges() filters it out. That is ok and intended: once
     `pgbedrock configure` is run it will ensure that this role owns everything in its own
-    personal schema """
-    personal_schemas = dbcontext.get_all_personal_schemas()
-    all_personal_schemas = set([schema + '.*' for schema in personal_schemas])
+    personal schema
 
-    if not all_personal_schemas:
+    Returns:
+        set: A set of common.ObjectName instances
+    """
+    personal_schemas = dbcontext.get_all_personal_schemas()
+    personal_schemas_star = set([
+        common.ObjectName(schema=objname.schema, unqualified_name='*') for objname in personal_schemas
+    ])
+
+    if not personal_schemas_star:
         return objects
 
     non_empty_personal_schemas = set()
-    for schema in personal_schemas:
-        if schema != role and not dbcontext.is_schema_empty(schema, objkind):
-            non_empty_personal_schemas.add(schema + '.*')
+    for objname in personal_schemas:
+        if objname.schema != role and not dbcontext.is_schema_empty(objname, objkind):
+            non_empty_personal_schemas.add(common.ObjectName(schema=objname.schema, unqualified_name='*'))
 
     if non_empty_personal_schemas.difference(objects) == set():
-        objects.difference_update(all_personal_schemas)
-        objects.add('personal_schemas.*')
+        objects.difference_update(personal_schemas_star)
+        objects.add(common.ObjectName(schema='personal_schemas', unqualified_name='*'))
 
     return objects
 
@@ -231,16 +244,19 @@ def determine_schema_privileges(role, dbcontext):
     this is confusing and non-intuitive, we will include schemas in the write section even if they
     are owned by this role (and because they are in the write section then they will also be granted
     read privileges as well).
+
+    Returns:
+        tuple: A tuple of (write privileges, read privileges), where each component in the tuple
+            is a set of common.ObjectName instances
     """
     # Make a copy of personal_schemas (by making a new set from it) as we will be mutating it
     personal_schemas = set(dbcontext.get_all_personal_schemas())
 
     # Get all schemas this role has write and read access to
-    write_schemas_and_owners = dbcontext.get_role_current_nondefaults(role, 'schemas', 'write')
-    read_schemas_and_owners = dbcontext.get_role_current_nondefaults(role,  'schemas', 'read')
-
-    write_schemas = {s for s, _ in write_schemas_and_owners}
-    read_schemas = {s for s, _ in read_schemas_and_owners}
+    write_schemas_and_privs = dbcontext.get_role_current_nondefaults(role, 'schemas', 'write')
+    write_schemas = set([objname for objname, _ in write_schemas_and_privs])
+    read_schemas_and_privs = dbcontext.get_role_current_nondefaults(role, 'schemas', 'read')
+    read_schemas = set([objname for objname, _ in read_schemas_and_privs])
 
     # Get all schemas owned by this role
     all_owned_schemas = dbcontext.get_all_schemas_and_owners()
@@ -251,27 +267,27 @@ def determine_schema_privileges(role, dbcontext):
     read_schemas.update(role_owned_schemas)
 
     # Remove this role's personal schema if it exists
-    write_schemas.difference_update({role})
-    read_schemas.difference_update({role})
-    personal_schemas.difference_update({role})
+    write_schemas.difference_update({common.ObjectName(role)})
+    read_schemas.difference_update({common.ObjectName(role)})
+    personal_schemas.difference_update({common.ObjectName(role)})
 
     # If all personal schemas are in write_schemas then replace them with 'personal_schemas'
     if personal_schemas and personal_schemas.difference(write_schemas) == set():
         write_schemas.difference_update(personal_schemas)
-        write_schemas.add('personal_schemas')
+        write_schemas.add(common.ObjectName('personal_schemas'))
 
     if personal_schemas and personal_schemas.difference(read_schemas) == set():
         read_schemas.difference_update(personal_schemas)
-        read_schemas.add('personal_schemas')
+        read_schemas.add(common.ObjectName('personal_schemas'))
 
     # Remove all schemas this role has write access to
     read_only_schemas = read_schemas.difference(write_schemas)
 
     schemas_privs = {}
     if write_schemas:
-        schemas_privs['write'] = sorted(write_schemas)
+        schemas_privs['write'] = write_schemas
     if read_only_schemas:
-        schemas_privs['read'] = sorted(read_only_schemas)
+        schemas_privs['read'] = read_only_schemas
 
     return schemas_privs
 
@@ -280,13 +296,14 @@ def determine_all_nonschema_privileges(role, objkind, dbcontext):
     all_writes = set()
     all_reads = set()
 
-    for schema, owner in dbcontext.get_all_schemas_and_owners().items():
+    for objname, owner in dbcontext.get_all_schemas_and_owners().items():
         # Skip this role's personal schema as we will be asserting upon running
         # pgbedrock that all objects in this schema are owned by this role
-        if role == schema and role == owner:
+        if role == objname.schema and role == owner:
             continue
 
-        writes, reads = determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext)
+        writes, reads = determine_nonschema_privileges_for_schema(role, objkind, objname,
+                                                                  dbcontext)
 
         all_writes.update(writes)
         all_reads.update(reads)
@@ -294,11 +311,11 @@ def determine_all_nonschema_privileges(role, objkind, dbcontext):
     return all_writes, all_reads
 
 
-def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
+def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext):
     """
     Determine all non-schema privileges granted to a given role for all objects of objkind in
-    the specified schema. Results will be returned as two sets: objects granted write access
-    and objects granted read access.
+    the specified schema `objname`. Results will be returned as two sets: objects granted write
+    access and objects granted read access.
 
     We explicitly start with writes because if a role has write access then pgbedrock will also
     grant it read access, meaning we won't need to grant that object a read. As a result, we have
@@ -318,31 +335,46 @@ def determine_nonschema_privileges_for_schema(role, objkind, schema, dbcontext):
     privilege then it will identify this as a role that should get write default privileges, which
     means that this role will get _all_ write-level default privileges for that objkind in this
     schema.
+
+    Args:
+        role (str)
+
+        objkind (str): The type of object. This must be one of the keys of
+            context.PRIVILEGE_MAP, e.g. 'schemas', 'tables', etc.
+
+        objname (common.ObjectName): The schema to determine non-schema privileges for
+
+        dbcontext (context.DatabaseContext): A context.DatabaseContext instance for getting
+            information for the associated database
+
+    Returns:
+        tuple: A tuple of with two items in it: a set of common.ObjectName instances with write
+            privileges and a set of common.ObjectName instances with read privileges
     """
     # Get all objects of this objkind in this schema and which are not owned by this role
-    objects_and_owners = dbcontext.get_schema_objects(schema)
+    objects_and_owners = dbcontext.get_schema_objects(objname)
     schema_objects = set()
     for entry in objects_and_owners:
         if entry.kind == objkind and entry.owner != role:
-            schema_objects.add(entry.name)
+            schema_objects.add(entry.objname)
 
-    has_default_write = dbcontext.has_default_privilege(role, schema, objkind, 'write')
-    all_writes = dbcontext.get_role_objects_with_access(role, schema, objkind, 'write')
+    has_default_write = dbcontext.has_default_privilege(role, objname, objkind, 'write')
+    all_writes = dbcontext.get_role_objects_with_access(role, objname, objkind, 'write')
 
     if has_default_write or (all_writes == schema_objects and all_writes != set()):
         # In the second condition, every object has a write privilege, so we assume that means
         # that this role should have default write privileges
-        return set([schema + '.*']), set()
+        return set([common.ObjectName(schema=objname.schema, unqualified_name='*')]), set()
 
     # If we haven't returned yet then no write default privilege exists; we will have to
     # grant each write individually, meaning we also need to look at read privileges
-    has_default_read = dbcontext.has_default_privilege(role, schema, objkind, 'read')
-    all_reads = dbcontext.get_role_objects_with_access(role, schema, objkind, 'read')
+    has_default_read = dbcontext.has_default_privilege(role, objname, objkind, 'read')
+    all_reads = dbcontext.get_role_objects_with_access(role, objname, objkind, 'read')
 
     if has_default_read or (all_reads == schema_objects and all_reads != set()):
         # In the second condition, every object has a read privilege, so we assume that means
         # that this role should have default read privileges
-        return all_writes, set([schema + '.*'])
+        return all_writes, set([common.ObjectName(schema=objname.schema, unqualified_name='*')])
     else:
         # We have to grant each read individually as well. Because a write will already grant
         # a read, we have to remove all write-granted objects from our read grants
@@ -412,7 +444,11 @@ def output_spec(spec):
             return dumper.represent_dict(data)
         return dumper.represent_scalar('tag:yaml.org,2002:null', '')
 
-    yaml.add_representer(dict, represent_dict)
+    def represent_objname(dumper, data):
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data.qualified_name)
+
+    FormattedDumper.add_representer(dict, represent_dict)
+    FormattedDumper.add_representer(common.ObjectName, represent_objname)
 
     print(yaml.dump(spec, Dumper=FormattedDumper, default_flow_style=False, indent=4))
 
@@ -441,7 +477,7 @@ def sort_sublists(data):
         for key, values in data.items():
             sorted_values = sort_sublists(values)
             data[key] = sorted_values
-    elif isinstance(data, list):
+    elif isinstance(data, (list, set)):
         data = sorted(data)
 
     return data
