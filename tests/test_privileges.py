@@ -539,7 +539,7 @@ def test_grant_default(mockdbcontext):
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
 
     # Grant default privileges to role0 from role1 for this schema
-    privconf.grant_default(grantor=ROLES[1], schema=SCHEMAS[0], privilege='SELECT')
+    privconf.grant_default(grantor=ROLES[1], schema=ObjectName(SCHEMAS[0]), privilege='SELECT')
 
     expected = [privs.Q_GRANT_DEFAULT.format(ROLES[1], SCHEMAS[0], 'SELECT', 'TABLES', rolename)]
     assert privconf.sql_to_run == expected
@@ -553,7 +553,7 @@ def test_revoke_default(mockdbcontext):
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
 
-    privconf.revoke_default(grantor=ROLES[1], schema=SCHEMAS[0], privilege='SELECT')
+    privconf.revoke_default(grantor=ROLES[1], schema=ObjectName(SCHEMAS[0]), privilege='SELECT')
 
     expected = [privs.Q_REVOKE_DEFAULT.format(ROLES[1], SCHEMAS[0], 'SELECT', 'TABLES', rolename)]
     assert privconf.sql_to_run == expected
