@@ -333,7 +333,7 @@ def test_determine_desired_defaults(mockdbcontext):
                                        desired_items=DUMMY, schema_writers=schema_writers,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
 
-    schemas = [SCHEMAS[0]]
+    schemas = [ObjectName(SCHEMAS[0])]
     roles = ROLES[1:]
     possible_privs = privs.PRIVILEGE_MAP[object_kind][access]
     expected = set(itertools.product(roles, schemas, possible_privs))
@@ -397,7 +397,7 @@ def test_identify_desired_objects(rolename, mockdbcontext):
     roles = list(ROLES[:3])
     # We have to remove this role since we don't grant default privileges to ourselves
     roles.remove(rolename)
-    expected_defaults = set(itertools.product(roles, [SCHEMAS[0]], possible_privs))
+    expected_defaults = set(itertools.product(roles, [ObjectName(SCHEMAS[0])], possible_privs))
 
     actual_defaults = privconf.desired_defaults
     assert actual_defaults == expected_defaults
@@ -497,9 +497,9 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_not_schema(moc
     # Check default privileges
     possible_privs = privs.PRIVILEGE_MAP[object_kind][access]
     expected_defaults = set([
-        (ROLES[2], ROLES[2], possible_privs[0]),
-        (ROLES[1], ROLES[2], possible_privs[0]),
-        (ROLES[3], ROLES[3], possible_privs[0])
+        (ROLES[2], ObjectName(ROLES[2]), possible_privs[0]),
+        (ROLES[1], ObjectName(ROLES[2]), possible_privs[0]),
+        (ROLES[3], ObjectName(ROLES[3]), possible_privs[0])
     ])
     actual_defaults = privconf.desired_defaults
     assert actual_defaults == expected_defaults

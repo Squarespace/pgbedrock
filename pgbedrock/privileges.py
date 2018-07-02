@@ -211,12 +211,16 @@ class PrivilegeAnalyzer(object):
     def analyze_defaults(self):
         """ Analyze default privileges. Note that we sort the grants / revokes before issuing
         them so the output will be more organized, making it easier for the end user to read """
-        defaults_to_grant = self.desired_defaults.difference(self.current_defaults)
+        #TODO: Remove the below
+        desired_defaults = set([
+            (grantor, schema.qualified_name, pg_priv_kind) for grantor, schema, pg_priv_kind in self.desired_defaults
+        ])
+        defaults_to_grant = desired_defaults.difference(self.current_defaults)
         logger.debug('defaults_to_grant: {}'.format(defaults_to_grant))
         for grantor, schema, pg_priv_kind in sorted(defaults_to_grant):
             self.grant_default(grantor, schema, pg_priv_kind)
 
-        defaults_to_revoke = self.current_defaults.difference(self.desired_defaults)
+        defaults_to_revoke = self.current_defaults.difference(desired_defaults)
         logger.debug('defaults_to_revoke: {}'.format(defaults_to_revoke))
         for grantor, schema, pg_priv_kind in sorted(defaults_to_revoke):
             self.revoke_default(grantor, schema, pg_priv_kind)
@@ -237,12 +241,16 @@ class PrivilegeAnalyzer(object):
                 self.revoke_nondefault(objname.qualified_name, pg_priv_kind)
 
     def determine_desired_defaults(self, schemas):
-        """ For any given schema, we want to grant default privileges to this role from each role
-        that can write in that schema. We cross this against all privilege types. """
+        """
+        For any given schema, we want to grant default privileges to this role from each role
+        that can write in that schema. We cross this against all privilege types.
+
+        Args:
+            schemas (set): A set of common.ObjectNames instances representing schemas
+        """
         self.desired_defaults = set()
         for schema in schemas:
-            #TODO: Remove this ObjectName casting
-            writers = self.schema_writers[common.ObjectName(schema)]
+            writers = self.schema_writers[schema]
             for writer in writers:
                 # We don't need to grant default privileges for things this role will create
                 if writer == self.rolename:
@@ -319,7 +327,7 @@ class PrivilegeAnalyzer(object):
         self.desired_nondefaults = set(itertools.product(desired_nondefault_objs, priv_types))
 
         if self.default_acl_possible:
-            self.determine_desired_defaults(schemas)
+            self.determine_desired_defaults([common.ObjectName(sch) for sch in schemas])
 
     def revoke_default(self, grantor, schema, privilege):
         query = Q_REVOKE_DEFAULT.format(grantor, schema, privilege, self.object_kind.upper(), self.rolename)
