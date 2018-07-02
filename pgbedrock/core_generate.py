@@ -352,7 +352,7 @@ def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext)
             privileges and a set of common.ObjectName instances with read privileges
     """
     # Get all objects of this objkind in this schema and which are not owned by this role
-    objects_and_owners = dbcontext.get_schema_objects(objname.schema)
+    objects_and_owners = dbcontext.get_schema_objects(objname)
     schema_objects = set()
     for entry in objects_and_owners:
         if entry.kind == objkind and entry.owner != role:

@@ -540,8 +540,15 @@ class DatabaseContext(object):
         return schema_objects
 
     def get_schema_objects(self, schema):
+        """
+        Args:
+            schema (common.ObjectName): The schema to get object for
+
+        Returns:
+            list
+        """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
-        return all_objects_and_owners.get(schema, [])
+        return all_objects_and_owners.get(schema.qualified_name, [])
 
     def is_schema_empty(self, schema, object_kind):
         """ Determine if the schema is empty with regard to the object kind specified """
