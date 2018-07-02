@@ -560,7 +560,7 @@ def test_revoke_default(mockdbcontext):
 
 
 def test_grant_nondefault(mockdbcontext):
-    table = quoted_object(SCHEMAS[0], TABLES[0])
+    table = ObjectName(SCHEMAS[0], TABLES[0])
     rolename = ROLES[0]
 
     # Grant the privilege
@@ -569,12 +569,12 @@ def test_grant_nondefault(mockdbcontext):
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
 
     privconf.grant_nondefault(table, 'SELECT')
-    expected = [privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', table, rolename)]
+    expected = [privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', table.qualified_name, rolename)]
     assert privconf.sql_to_run == expected
 
 
 def test_revoke_nondefault(mockdbcontext):
-    table = quoted_object(SCHEMAS[0], TABLES[0])
+    table = ObjectName(SCHEMAS[0], TABLES[0])
     rolename = ROLES[0]
 
     # Revoke the privilege
@@ -583,7 +583,7 @@ def test_revoke_nondefault(mockdbcontext):
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext)
 
     privconf.revoke_nondefault(table, 'SELECT')
-    expected = [privs.Q_REVOKE_NONDEFAULT.format('SELECT', 'TABLE', table, rolename)]
+    expected = [privs.Q_REVOKE_NONDEFAULT.format('SELECT', 'TABLE', table.qualified_name, rolename)]
     assert privconf.sql_to_run == expected
 
 

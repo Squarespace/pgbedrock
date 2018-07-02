@@ -228,13 +228,13 @@ class PrivilegeAnalyzer(object):
         logger.debug('nondefaults_to_grant: {}'.format(nondefaults_to_grant))
         if nondefaults_to_grant:
             for objname, pg_priv_kind in sorted(nondefaults_to_grant):
-                self.grant_nondefault(objname.qualified_name, pg_priv_kind)
+                self.grant_nondefault(objname, pg_priv_kind)
 
         nondefaults_to_revoke = self.current_nondefaults.difference(self.desired_nondefaults)
         logger.debug('nondefaults_to_revoke: {}'.format(nondefaults_to_revoke))
         if nondefaults_to_revoke:
             for objname, pg_priv_kind in sorted(nondefaults_to_revoke):
-                self.revoke_nondefault(objname.qualified_name, pg_priv_kind)
+                self.revoke_nondefault(objname, pg_priv_kind)
 
     def determine_desired_defaults(self, schemas):
         """
@@ -277,9 +277,10 @@ class PrivilegeAnalyzer(object):
                                        self.object_kind.upper(), self.rolename)
         self.sql_to_run.append(query)
 
-    def grant_nondefault(self, objname_as_str, privilege):
+    def grant_nondefault(self, objname, privilege):
         obj_kind_singular = self.object_kind.upper()[:-1]
-        query = Q_GRANT_NONDEFAULT.format(privilege, obj_kind_singular, objname_as_str, self.rolename)
+        query = Q_GRANT_NONDEFAULT.format(privilege, obj_kind_singular,
+                                          objname.qualified_name, self.rolename)
         self.sql_to_run.append(query)
 
     def identify_desired_objects(self):
@@ -331,7 +332,8 @@ class PrivilegeAnalyzer(object):
                                         self.object_kind.upper(), self.rolename)
         self.sql_to_run.append(query)
 
-    def revoke_nondefault(self, objname_as_str, privilege):
+    def revoke_nondefault(self, objname, privilege):
         obj_kind_singular = self.object_kind.upper()[:-1]
-        query = Q_REVOKE_NONDEFAULT.format(privilege, obj_kind_singular, objname_as_str, self.rolename)
+        query = Q_REVOKE_NONDEFAULT.format(privilege, obj_kind_singular,
+                                           objname.qualified_name, self.rolename)
         self.sql_to_run.append(query)
