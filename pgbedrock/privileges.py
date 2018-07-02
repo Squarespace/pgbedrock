@@ -303,7 +303,7 @@ class PrivilegeAnalyzer(object):
                 # The end-user is asking something impossible
                 common.fail(PERSONAL_SCHEMAS_ERROR_MSG.format(self.rolename, self.object_kind, self.access))
             elif objname.qualified_name == 'personal_schemas.*':
-                schemas.extend([ps.qualified_name for ps in self.personal_schemas])
+                schemas.extend(self.personal_schemas)
             elif objname.unqualified_name != '*':
                 # This is a single non-default privilege ask
                 owner = self.get_object_owner(objname)
@@ -311,12 +311,12 @@ class PrivilegeAnalyzer(object):
                     desired_nondefault_objs.add(objname)
             else:
                 # We were given a schema.*; we'll process those below
-                schemas.append(objname.schema)
+                schemas.append(objname.only_schema())
 
         for schema in schemas:
             # For schemas, we wish to have privileges for all existing objects, so get all
             # existing objects not owned by this role and add them to self.desired_nondefaults
-            schema_objects = self.get_schema_objects(schema)
+            schema_objects = self.get_schema_objects(schema.qualified_name)
             desired_nondefault_objs.update(schema_objects)
 
         # Cross our desired objects with the desired privileges
@@ -324,7 +324,7 @@ class PrivilegeAnalyzer(object):
         self.desired_nondefaults = set(itertools.product(desired_nondefault_objs, priv_types))
 
         if self.default_acl_possible:
-            self.determine_desired_defaults([common.ObjectName(sch) for sch in schemas])
+            self.determine_desired_defaults(schemas)
 
     def revoke_default(self, grantor, schema, privilege):
         query = Q_REVOKE_DEFAULT.format(grantor, schema.qualified_name, privilege,
