@@ -589,7 +589,7 @@ def test_revoke_nondefault(mockdbcontext):
 
 def test_analyze_defaults(mockdbcontext):
     mockdbcontext.get_role_current_defaults = lambda x, y, z: set([
-        (ROLES[3], SCHEMAS[0], 'SELECT'),
+        (ROLES[3], ObjectName(SCHEMAS[0]), 'SELECT'),
     ])
     mockdbcontext.get_role_current_nondefaults = lambda x, y, z: set()
     mockdbcontext.get_all_object_attributes = lambda: {

@@ -286,11 +286,11 @@ class DatabaseContext(object):
             {roleA: {
                 objkindA: {
                     'read': set([
-                        (grantor, nspname, privilege),
+                        (grantor, ObjectName(nspname), privilege),
                         ...
                         ]),
                     'write': set([
-                        (grantor, nspname, privilege),
+                        (grantor, ObjectName(nspname), privilege),
                         ...
                         ])
                     },
@@ -311,7 +311,7 @@ class DatabaseContext(object):
             is_read_priv = row.privilege in PRIVILEGE_MAP[row.objkind]['read']
             access_key = 'read' if is_read_priv else 'write'
 
-            entry = (row.grantor, row.schema, row.privilege)
+            entry = (row.grantor, common.ObjectName(row.schema), row.privilege)
             role_defaults = current_defaults[row.grantee]
 
             # Create this role's dict substructure for the first entry we come across
@@ -335,11 +335,12 @@ class DatabaseContext(object):
             return set()
 
     def has_default_privilege(self, rolename, schema, object_kind, access):
+        #TODO: Convert this to use ObjectName instances
         write_defaults = self.get_role_current_defaults(rolename, object_kind, access)
-        for grantor, nspname, priv in write_defaults:
+        for grantor, objname, priv in write_defaults:
             # So long as at least one default privilege exists in this schema and was not granted
             # by this role we consider the role to have default privileges in that schema
-            if nspname == schema and grantor != rolename:
+            if objname.qualified_name == schema and grantor != rolename:
                 return True
 
         return False

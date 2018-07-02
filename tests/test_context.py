@@ -40,7 +40,7 @@ def test_get_all_current_defaults(cursor):
         ROLES[0]: {
             'tables': {
                 'read': set([
-                    (ROLES[3], SCHEMAS[0], 'SELECT'),
+                    (ROLES[3], common.ObjectName(SCHEMAS[0]), 'SELECT'),
                 ]),
                 'write': set(),
             }
@@ -92,10 +92,10 @@ def test_has_default_privilege(rolename, schema, object_kind, access, expected):
         'role1': {
             'tables': {
                 'read': set([
-                    ('role1', 'schema2', 'SELECT'),
+                    ('role1', common.ObjectName('schema2'), 'SELECT'),
                 ]),
                 'write': set([
-                    ('not_this_role', 'schema1', 'UPDATE'),
+                    ('not_this_role', common.ObjectName('schema1'), 'UPDATE'),
                 ]),
             }
         }

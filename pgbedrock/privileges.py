@@ -194,11 +194,7 @@ class PrivilegeAnalyzer(object):
         self.personal_schemas = personal_schemas
         self.default_acl_possible = self.object_kind in OBJECTS_WITH_DEFAULTS
 
-        current_defaults = dbcontext.get_role_current_defaults(rolename, object_kind, access) or set()
-        #TODO: Remove the below
-        self.current_defaults = set([
-            (grantor, common.ObjectName(schema), pg_priv_kind) for grantor, schema, pg_priv_kind in current_defaults
-        ])
+        self.current_defaults = dbcontext.get_role_current_defaults(rolename, object_kind, access)
         self.current_nondefaults = dbcontext.get_role_current_nondefaults(rolename, object_kind, access)
 
         self.all_object_attrs = dbcontext.get_all_object_attributes()
@@ -218,6 +214,7 @@ class PrivilegeAnalyzer(object):
         defaults_to_grant = self.desired_defaults.difference(self.current_defaults)
         logger.debug('defaults_to_grant: {}'.format(defaults_to_grant))
         for grantor, schema, pg_priv_kind in sorted(defaults_to_grant):
+            #TODO: Pass ObjectNames and not strings here and below
             self.grant_default(grantor, schema.qualified_name, pg_priv_kind)
 
         defaults_to_revoke = self.current_defaults.difference(self.desired_defaults)
