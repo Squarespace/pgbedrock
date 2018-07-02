@@ -526,7 +526,7 @@ class DatabaseContext(object):
     def get_all_nonschema_objects_and_owners(self):
         """
         For all objkinds other than schemas return a dict of the form
-            {schema_name: [(objkind, objname, objowner, is_dependent), ...]}
+            {common.ObjectName(schema_name): [(objkind, objname, objowner, is_dependent), ...]}
 
         This is primarily a helper for DatabaseContext.get_schema_objects so we have O(1)
         schema object lookups instead of needing to iterate through all objects every time
@@ -535,7 +535,7 @@ class DatabaseContext(object):
         for row in self.get_all_raw_object_attributes():
             if row.kind != 'schemas':
                 objinfo = ObjectInfo(row.kind, row.objname, row.owner, row.is_dependent)
-                schema_objects[row.schema].append(objinfo)
+                schema_objects[row.objname.only_schema()].append(objinfo)
 
         return schema_objects
 
@@ -548,10 +548,22 @@ class DatabaseContext(object):
             list
         """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
-        return all_objects_and_owners.get(schema.qualified_name, [])
+        return all_objects_and_owners.get(schema, [])
 
     def is_schema_empty(self, schema, object_kind):
-        """ Determine if the schema is empty with regard to the object kind specified """
+        """ Determine if the schema is empty with regard to the object kind specified
+
+        If there are no objects in the schema of kind object_kind but there are objects in the
+        schema of other kinds, this function will return True (i.e. the schema is empty of this
+        particular kind of object)
+
+        Args:
+            schema (common.ObjectName): The schema to check
+            object_kind (str): The object kind to look for
+
+        Returns:
+            bool
+        """
         all_objects_and_owners = self.get_all_nonschema_objects_and_owners()
         for obj in all_objects_and_owners.get(schema, []):
             if obj.kind == object_kind:

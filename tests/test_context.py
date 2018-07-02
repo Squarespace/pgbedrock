@@ -466,13 +466,11 @@ def test_get_schema_owner():
 def test_get_all_nonschema_objects_and_owners(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
     expected = {
-        SCHEMAS[0]:
-        [
+        common.ObjectName(SCHEMAS[0]): [
             context.ObjectInfo('tables', common.ObjectName(SCHEMAS[0], TABLES[0]), ROLES[0], False),
             context.ObjectInfo('sequences', common.ObjectName(SCHEMAS[0], SEQUENCES[1]), ROLES[0], False),
         ],
-        SCHEMAS[1]:
-        [
+        common.ObjectName(SCHEMAS[1]): [
             context.ObjectInfo('tables', common.ObjectName(SCHEMAS[1], TABLES[0]), ROLES[1], False),
             context.ObjectInfo('sequences', common.ObjectName(SCHEMAS[1], SEQUENCES[2]), ROLES[1], False),
         ],
@@ -494,7 +492,9 @@ def test_get_schema_objects():
     schema = common.ObjectName('foo')
     expected = 'bar'
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=False)
-    dbcontext._cache['get_all_nonschema_objects_and_owners'] = lambda: {'foo': expected}
+    dbcontext._cache['get_all_nonschema_objects_and_owners'] = lambda: {
+        common.ObjectName('foo'): expected
+    }
     actual = dbcontext.get_schema_objects(schema)
     assert actual == expected
 
@@ -502,7 +502,7 @@ def test_get_schema_objects():
 def test_get_schema_objects_no_entry():
     dbcontext = context.DatabaseContext(cursor=DUMMY, verbose=False)
     dbcontext._cache['get_all_nonschema_objects_and_owners'] = lambda: {
-        'foo': 'bar',
+        common.ObjectName('foo'): 'bar',
     }
     actual = dbcontext.get_schema_objects(common.ObjectName('key_not_in_response'))
     assert actual == []

@@ -219,7 +219,7 @@ def collapse_personal_schemas(role, objects, objkind, dbcontext):
 
     non_empty_personal_schemas = set()
     for objname in personal_schemas:
-        if objname.schema != role and not dbcontext.is_schema_empty(objname.schema, objkind):
+        if objname.schema != role and not dbcontext.is_schema_empty(objname, objkind):
             non_empty_personal_schemas.add(common.ObjectName(schema=objname.schema, unqualified_name='*'))
 
     if non_empty_personal_schemas.difference(objects) == set():
