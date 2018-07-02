@@ -510,17 +510,19 @@ def test_get_spec_schemas():
         'role0': {
              'has_personal_schema': True,
              'owns': {
-                 'schemas': ['schemas0']
+                 'schemas': [ObjectName('schemas0')]
              },
         },
         'role1': {
              'owns': {
-                 'schemas': ['schemas1']
+                 'schemas': [ObjectName('schemas1')]
              },
         }
     }
 
-    assert spec_inspector.get_spec_schemas(spec) == set(['role0', 'schemas0', 'schemas1'])
+    expected = set([ObjectName('role0'), ObjectName('schemas0'), ObjectName('schemas1')])
+    actual = spec_inspector.get_spec_schemas(spec)
+    assert actual == expected
 
 
 def test_convert_spec_to_objectnames_owns_subdict():

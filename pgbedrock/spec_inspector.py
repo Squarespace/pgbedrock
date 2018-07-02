@@ -398,7 +398,7 @@ def get_spec_schemas(spec):
         spec_schemas.extend(config.get('owns', {}).get('schemas', []))
 
         if config.get('has_personal_schema'):
-            spec_schemas.append(rolename)
+            spec_schemas.append(common.ObjectName(rolename))
 
     return set(spec_schemas)
 
