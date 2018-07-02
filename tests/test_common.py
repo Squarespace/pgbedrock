@@ -18,16 +18,6 @@ def test_check_name_succeeds():
     assert rolename == common.check_name(rolename)
 
 
-@pytest.mark.parametrize('input, expected', [
-    ('myschema.myschema.mytable', 'myschema."myschema.mytable"'),
-    ('myschema."myschema.mytable"', 'myschema."myschema.mytable"'),
-    ('myschema.mytable', 'myschema."mytable"'),
-    ('unqualified', 'unqualified'),
-])
-def test_ensure_quoted_identifier(input, expected):
-    assert common.ensure_quoted_identifier(input) == expected
-
-
 def test_get_db_connection_fails(capsys):
     with pytest.raises(SystemExit) as err:
         common.get_db_connection('foo', 'foo', 'foo', 'foo', 'foo')
