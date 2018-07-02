@@ -352,7 +352,7 @@ class DatabaseContext(object):
             set: A set of common.ObjectName instances
         """
         objects_with_access = self.get_role_current_nondefaults(rolename, object_kind, access)
-        results = set([objname for objname, _ in objects_with_access if objname.schema == schema])
+        results = set([objname for objname, _ in objects_with_access if objname.only_schema() == schema])
         return results
 
     def get_all_current_nondefaults(self):

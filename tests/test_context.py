@@ -218,7 +218,8 @@ def test_get_role_objects_with_access(access, expected):
             }
         }
     }
-    actual = dbcontext.get_role_objects_with_access(ROLES[0], SCHEMAS[0], 'tables', access)
+    actual = dbcontext.get_role_objects_with_access(ROLES[0], common.ObjectName(SCHEMAS[0]),
+                                                    'tables', access)
     assert actual == expected
 
 

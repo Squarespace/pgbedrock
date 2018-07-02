@@ -359,8 +359,7 @@ def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext)
             schema_objects.add(entry.objname)
 
     has_default_write = dbcontext.has_default_privilege(role, objname, objkind, 'write')
-    # TODO: Convert the below to use ObjectNames
-    all_writes = dbcontext.get_role_objects_with_access(role, objname.schema, objkind, 'write')
+    all_writes = dbcontext.get_role_objects_with_access(role, objname, objkind, 'write')
 
     if has_default_write or (all_writes == schema_objects and all_writes != set()):
         # In the second condition, every object has a write privilege, so we assume that means
@@ -370,7 +369,7 @@ def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext)
     # If we haven't returned yet then no write default privilege exists; we will have to
     # grant each write individually, meaning we also need to look at read privileges
     has_default_read = dbcontext.has_default_privilege(role, objname, objkind, 'read')
-    all_reads = dbcontext.get_role_objects_with_access(role, objname.schema, objkind, 'read')
+    all_reads = dbcontext.get_role_objects_with_access(role, objname, objkind, 'read')
 
     if has_default_read or (all_reads == schema_objects and all_reads != set()):
         # In the second condition, every object has a read privilege, so we assume that means
@@ -447,7 +446,6 @@ def output_spec(spec):
 
     def represent_objname(dumper, data):
         return dumper.represent_scalar('tag:yaml.org,2002:str', data.qualified_name)
-        # return dumper.represent_scalar('!str', data.qualified_name)
 
     FormattedDumper.add_representer(dict, represent_dict)
     FormattedDumper.add_representer(common.ObjectName, represent_objname)
