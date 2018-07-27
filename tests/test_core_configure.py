@@ -182,7 +182,7 @@ def test_configure_schema_role_has_dash(tmpdir, capsys, db_config, cursor, base_
     spec = copy.copy(base_spec)
     spec += dedent("""
         {}:
-            has_personal_schema: yes
+            has_personal_schema: true
         """.format(role))
 
     spec_path = tmpdir.join('spec.yml')
@@ -198,7 +198,45 @@ def test_configure_schema_role_has_dash(tmpdir, capsys, db_config, cursor, base_
              privileges=True,
              live=False,
              verbose=False
-             )
+        )
+    )
+    core_configure.configure(**params)
+    out, err = capsys.readouterr()
+    assert own.Q_CREATE_SCHEMA.format(role, role) in out
+
+
+def test_configure_schema_role_has_dash_and_default_privs(
+    tmpdir,
+    capsys,
+    db_config,
+    cursor,
+    base_spec
+):
+    spec = copy.deepcopy(base_spec)
+    spec += dedent("""
+    dash-user:
+        has_personal_schema: true
+    otheruser:
+        privileges:
+            schemas:
+                read:
+                    - dash-user
+    """)
+
+    spec_path = tmpdir.join('spec.yml')
+    spec_path.write(spec)
+
+    params = copy.deepcopy(db_config)
+    params.update(
+        dict(spec_path=spec_path.strpath,
+             prompt=False,
+             attributes=True,
+             memberships=True,
+             ownerships=True,
+             privileges=True,
+             live=False,
+             verbose=False
+        )
     )
     core_configure.configure(**params)
     out, err = capsys.readouterr()
