@@ -19,11 +19,11 @@ def get_version():
 
 
 required = [
-    'click==6.7',
-    'psycopg2==2.7.3',
-    'PyYAML==3.12',
-    'Jinja2==2.9.6',
-    'cerberus==1.1',
+    'Cerberus',
+    'click',
+    'Jinja2',
+    'psycopg2',
+    'PyYAML',
 ]
 
 setup(
