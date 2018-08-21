@@ -54,9 +54,9 @@ PG_COLUMN_NAME = {
 COLUMN_NAME_TO_KEYWORD = {v: k for k, v in PG_COLUMN_NAME.items()}
 
 
-def analyze_attributes(spec, cursor, verbose):
+def analyze_attributes(spec, cursor, verbose, attributes_source_table):
     logger.debug('Starting analyze_attributes()')
-    dbcontext = DatabaseContext(cursor, verbose)
+    dbcontext = DatabaseContext(cursor, verbose, attributes_source_table)
 
     # We disable the progress bar when showing verbose output (using '' as our bar_template)
     # or # the bar will get lost in the # output

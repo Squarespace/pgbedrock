@@ -24,7 +24,7 @@ Q_GET_ALL_CURRENT_DEFAULTS = """
             (aclexplode(def.defaclacl)).privilege_type
         FROM
             pg_default_acl def
-            JOIN pg_authid auth
+            JOIN pg_roles auth
                     ON def.defaclrole = auth.oid
             JOIN pg_namespace nsp
                     ON def.defaclnamespace = nsp.oid
@@ -41,7 +41,7 @@ Q_GET_ALL_CURRENT_DEFAULTS = """
         subq.privilege_type
     FROM
         subq
-        JOIN pg_authid t_grantee
+        JOIN pg_roles t_grantee
             ON subq.grantee_oid = t_grantee.oid
     WHERE
         subq.grantor_oid != subq.grantee_oid
@@ -65,7 +65,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
             (aclexplode(c.relacl)).privilege_type
         FROM
             pg_class c
-            JOIN pg_authid t_owner
+            JOIN pg_roles t_owner
                 ON c.relowner = t_owner.OID
             JOIN pg_namespace nsp
                 ON c.relnamespace = nsp.oid
@@ -83,7 +83,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
              t_owner.rolname AS owner,
              (aclexplode(nsp.nspacl)).privilege_type
         FROM pg_namespace nsp
-        JOIN pg_authid t_owner
+        JOIN pg_roles t_owner
             ON nsp.nspowner = t_owner.OID
     ), combined AS (
         SELECT *
@@ -100,7 +100,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
         combined.privilege_type
     FROM
         combined
-        JOIN pg_authid t_grantee
+        JOIN pg_roles t_grantee
             ON combined.grantee_oid = t_grantee.oid
         WHERE combined.owner != t_grantee.rolname
     ;
@@ -119,7 +119,7 @@ Q_GET_ALL_ROLE_ATTRIBUTES = """
         rolreplication,
         rolsuper,
         rolvaliduntil
-    FROM pg_authid
+    FROM {source_table}
     WHERE rolname != 'pg_signal_backend'
     ;
     """
@@ -130,9 +130,9 @@ Q_GET_ALL_MEMBERSHIPS = """
         auth_group.rolname AS group
     FROM
         pg_auth_members link_table
-        JOIN pg_authid auth_member
+        JOIN pg_roles auth_member
             ON link_table.member = auth_member.oid
-        JOIN pg_authid auth_group
+        JOIN pg_roles auth_group
             ON link_table.roleid = auth_group.oid
     ;
     """
@@ -191,7 +191,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
         t_owner.rolname AS owner,
         co.is_dependent
     FROM combined AS co
-    JOIN pg_authid t_owner
+    JOIN pg_roles t_owner
         ON co.owner_id = t_owner.OID
     WHERE
         co.schema NOT LIKE 'pg\_t%'
@@ -201,7 +201,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
 Q_GET_ALL_PERSONAL_SCHEMAS = """
     SELECT nsp.nspname
     FROM pg_namespace nsp
-        JOIN pg_authid auth
+        JOIN pg_roles auth
             ON  nsp.nspname = auth.rolname
     WHERE auth.rolcanlogin IS TRUE
     ;
@@ -256,10 +256,11 @@ class DatabaseContext(object):
         'get_version_info',
     }
 
-    def __init__(self, cursor, verbose):
+    def __init__(self, cursor, verbose, attributes_source_table='pg_authid'):
         self.cursor = cursor
         self.verbose = verbose
         self._cache = dict()
+        self._attributes_source_table = attributes_source_table
 
     def __getattribute__(self, attr):
         """ If the requested attribute should be cached and hasn't, fetch it and cache it. """
@@ -413,9 +414,13 @@ class DatabaseContext(object):
         except KeyError:
             return set()
 
-    def get_all_role_attributes(self):
-        """ Return a dict with key = rolname and values = all fields in pg_authid """
-        common.run_query(self.cursor, self.verbose, Q_GET_ALL_ROLE_ATTRIBUTES)
+    def get_all_role_attributes(self, source_table=None):
+        """ Return a dict with key = rolname and values = all fields in pg_authid/pg_roles """
+
+        if source_table is None:
+            source_table = self._attributes_source_table
+
+        common.run_query(self.cursor, self.verbose, Q_GET_ALL_ROLE_ATTRIBUTES.format(source_table=source_table))
         role_attributes = {row['rolname']: dict(row) for row in self.cursor.fetchall()}
         return role_attributes
 

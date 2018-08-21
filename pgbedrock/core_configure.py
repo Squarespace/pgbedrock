@@ -66,7 +66,7 @@ def run_password_sql(cursor, all_password_sql_to_run):
 
 
 def configure(spec_path, host, port, user, password, dbname, prompt, attributes, memberships,
-              ownerships, privileges, live, verbose):
+              ownerships, privileges, live, verbose, attributes_source_table):
     """
     Configure the role attributes, memberships, object ownerships, and/or privileges of a
     database cluster to match a desired spec.
@@ -106,6 +106,8 @@ def configure(spec_path, host, port, user, password, dbname, prompt, attributes,
 
         verbose - bool; whether to show all queries that are executed and all debug log
             messages during execution
+
+        attributes_source_table - str; the table to read use attributes from (pg_authid or pg_roles)
     """
     if verbose:
         root_logger = logging.getLogger('')
@@ -126,7 +128,7 @@ def configure(spec_path, host, port, user, password, dbname, prompt, attributes,
         sql_to_run.append(create_divider('attributes'))
         # Password changes happen within the attributes.py module itself so we don't leak
         # passwords; as a result we need to see if password changes occurred
-        module_sql, all_password_sql_to_run = analyze_attributes(spec, cursor, verbose)
+        module_sql, all_password_sql_to_run = analyze_attributes(spec, cursor, verbose, attributes_source_table)
         run_module_sql(module_sql, cursor, verbose)
         if all_password_sql_to_run:
             password_changed = True

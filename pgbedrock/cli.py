@@ -27,8 +27,9 @@ def entrypoint():
 @click.option('--privileges/--no-privileges', default=True, help='whether to configure privileges (default: --privileges)')
 @click.option('--live/--check', default=False, help='whether to actually make changes ("live") or only show what would be changed ("check") (default: --check)')
 @click.option('--verbose/--no-verbose', default=False, help='whether to show debug-level logging messages while running (default: --no-verbose)')
+@click.option('--alternate-attributes-table/--no-alternate-attributes-table', default=False, help='whether to use pg_roles instead of pg_authid (default: --no-alternate-attributes-table)')
 def configure(spec, host, port, user, password, dbname, prompt, attributes, memberships, ownerships,
-              privileges, live, verbose):
+              privileges, live, verbose, alternate_attributes_table):
     """
     Configure the role attributes, memberships, object ownerships, and/or privileges of a
     database cluster to match a desired spec.
@@ -41,8 +42,11 @@ def configure(spec, host, port, user, password, dbname, prompt, attributes, memb
     In addition, using --verbose will print to STDOUT all debug statements and all SQL queries
     issued by pgbedrock.
     """
+
+    attributes_source_table = 'pg_roles' if alternate_attributes_table else 'pg_authid'
+
     core_configure.configure(spec, host, port, user, password, dbname, prompt, attributes,
-                             memberships, ownerships, privileges, live, verbose)
+                             memberships, ownerships, privileges, live, verbose, attributes_source_table)
 
 
 @entrypoint.command(short_help='Generate a YAML spec for a database')
@@ -53,12 +57,15 @@ def configure(spec, host, port, user, password, dbname, prompt, attributes, memb
 @click.option('-d', '--dbname', default=USER, help='database to connect to (default: "{}")'.format(USER))
 @click.option('--prompt/--no-prompt', default=False, help='prompt the user to input a password (default: --no-prompt)')
 @click.option('--verbose/--no-verbose', default=False, help='whether to show debug-level logging messages while running (default: --no-verbose)')
-def generate(host, port, user, password, dbname, prompt, verbose):
+@click.option('--alternate-attributes-table/--no-alternate-attributes-table', default=False, help='whether to use pg_roles instead of pg_authid (default: --no-alternate-attributes-table)')
+def generate(host, port, user, password, dbname, prompt, verbose, alternate_attributes_table):
     """
     Generate a YAML spec that represents the roles, memberships, ownerships, and/or privileges of a
     database.
     """
-    core_generate.generate(host, port, user, password, dbname, prompt, verbose)
+
+    attributes_source_table = 'pg_roles' if alternate_attributes_table else 'pg_authid'
+    core_generate.generate(host, port, user, password, dbname, prompt, verbose, attributes_source_table)
 
 
 if __name__ == '__main__':

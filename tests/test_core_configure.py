@@ -35,7 +35,8 @@ def test_configure_no_changes_needed(tmpdir, capsys, db_config, base_spec):
              ownerships=True,
              privileges=True,
              live=False,
-             verbose=False
+             verbose=False,
+             attributes_source_table='pg_authid'
              )
     )
     core_configure.configure(**params)
@@ -63,7 +64,8 @@ def test_configure_live_mode_works(capsys, cursor, spec_with_new_user, db_config
              ownerships=True,
              privileges=True,
              live=live_mode,
-             verbose=False
+             verbose=False,
+             attributes_source_table='pg_authid'
              )
     )
     core_configure.configure(**params)
@@ -115,6 +117,7 @@ def test_configure_live_does_not_leak_passwords(tmpdir, capsys, cursor, db_confi
              privileges=True,
              live=True,
              verbose=True,
+             attributes_source_table='pg_authid',
              )
     )
     core_configure.configure(**params)
@@ -162,7 +165,8 @@ def test_no_password_attribute_makes_password_none(cursor, spec_with_new_user, d
              ownerships=True,
              privileges=True,
              live=True,
-             verbose=False
+             verbose=False,
+             attributes_source_table='pg_authid',
              )
     )
     core_configure.configure(**params)
@@ -197,7 +201,8 @@ def test_configure_schema_role_has_dash(tmpdir, capsys, db_config, cursor, base_
              ownerships=True,
              privileges=True,
              live=False,
-             verbose=False
+             verbose=False,
+             attributes_source_table='pg_authid',
              )
     )
     core_configure.configure(**params)

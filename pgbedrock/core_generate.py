@@ -382,13 +382,13 @@ def determine_nonschema_privileges_for_schema(role, objkind, objname, dbcontext)
         return all_writes, only_reads
 
 
-def create_spec(host, port, user, password, dbname, verbose):
+def create_spec(host, port, user, password, dbname, verbose, attributes_source_table):
     db_connection = common.get_db_connection(host, port, dbname, user, password)
     # We will only be reading, so it is worth being safe here and ensuring that we can't write
     db_connection.set_session(readonly=True)
     cursor = db_connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    dbcontext = DatabaseContext(cursor, verbose)
+    dbcontext = DatabaseContext(cursor, verbose, attributes_source_table)
     spec = initialize_spec(dbcontext)
     spec = add_attributes(spec, dbcontext)
     spec = add_memberships(spec, dbcontext)
@@ -483,7 +483,7 @@ def sort_sublists(data):
     return data
 
 
-def generate(host, port, user, password, dbname, prompt, verbose):
+def generate(host, port, user, password, dbname, prompt, verbose, attributes_source_table):
     """
     Generate a YAML spec that represents the role attributes, memberships, object ownerships,
     and privileges for all roles in a database.
@@ -508,6 +508,8 @@ def generate(host, port, user, password, dbname, prompt, verbose):
 
         verbose - bool; whether to show all queries that are executed and all debug log
             messages during execution
+
+        attributes_source_table - str; the table to read use attributes from (pg_authid or pg_roles)
     """
     if verbose:
         root_logger = logging.getLogger('')
@@ -516,6 +518,6 @@ def generate(host, port, user, password, dbname, prompt, verbose):
     if prompt:
         password = getpass.getpass()
 
-    spec = create_spec(host, port, user, password, dbname, verbose)
+    spec = create_spec(host, port, user, password, dbname, verbose, attributes_source_table)
     sorted_spec = sort_sublists(spec)
     output_spec(sorted_spec)

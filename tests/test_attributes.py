@@ -41,7 +41,8 @@ def roleconf(request, mockdbcontext):
 @run_setup_sql([
     attr.Q_CREATE_ROLE.format(ROLE1),
     ])
-def test_analyze_attributes_modifying_objects(capsys, cursor):
+@pytest.mark.parametrize('attributes_source_table', ['pg_authid', 'pg_roles'])
+def test_analyze_attributes_modifying_objects(capsys, cursor, attributes_source_table):
     """
     End-to-end test.
     ROLE1 exists and has some non-defaults
@@ -82,7 +83,12 @@ def test_analyze_attributes_modifying_objects(capsys, cursor):
     expected.add(attr.Q_ALTER_ROLE.format(ROLE2, 'SUPERUSER'))
     expected.add(attr.Q_CREATE_ROLE.format(ROLE3))
 
-    actual, password_changed = attr.analyze_attributes(spec, cursor, verbose=False)
+    if attributes_source_table == 'pg_roles':
+        # pg_roles masks the user's password, so the password change
+        # logic is always activated (for existing users)
+        expected.add('--' + attr.Q_ALTER_PASSWORD.format(ROLE1, '******'))
+
+    actual, password_changed = attr.analyze_attributes(spec, cursor, verbose=False, attributes_source_table=attributes_source_table)
     # Filter out changes for roles that existed before this test
     actual = set([s for s in actual if ('postgres' not in s and 'test_user' not in s)])
 
@@ -421,6 +427,6 @@ def test_set_password_log_message_is_masked(capsys, cursor):
         ROLE1: {'attributes': ['PASSWORD {}'.format(new_password)]},
     }
 
-    _, password_all_sql_to_run = attr.analyze_attributes(spec, cursor, verbose=False)
+    _, password_all_sql_to_run = attr.analyze_attributes(spec, cursor, verbose=False, attributes_source_table='pg_authid')
 
     assert password_all_sql_to_run == [attr.Q_ALTER_PASSWORD.format(ROLE1, new_password)]
