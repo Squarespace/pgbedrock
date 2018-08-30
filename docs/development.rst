@@ -43,7 +43,9 @@ Releasing A New Version
 If you make a PR that gets merged into master, a new version of pgbedrock can be created as follows.
 
 1. Increment the ``__version__`` in the ``pgbedrock/__init__.py`` file and commit that change.
-2. Push a new git tag to the repo by doing:
+2. Update the `CHANGELOG` file calling out changes to code regarding added features, new behaviors that could introduce breaking changes, and credits.
+3. Update `CONTRIBUTORS`, adding new contributors alphabetically according to `git log --format=%an | sort | uniq`, excluding duplicates and correcting author names as requested by contributors.
+4. Push a new git tag to the repo by doing:
 
     * Write the tag message in a dummy file called ``tag_message``. We do this to allow multi-line tag
       messages
