@@ -38,8 +38,8 @@ def has_changes(statements):
     return False
 
 
-def run_module_sql(module_sql, cursor, verbose):
-    if module_sql and has_changes(module_sql):
+def run_module_sql(module_sql, cursor, live, verbose):
+    if module_sql and has_changes(module_sql) and live:
         # Put all SQL into 1 string to reduce network IO of sending many small calls to Postgres
         combined_sql = '\n'.join(module_sql)
         common.run_query(cursor, verbose, combined_sql)
@@ -127,7 +127,7 @@ def configure(spec_path, host, port, user, password, dbname, prompt, attributes,
         # Password changes happen within the attributes.py module itself so we don't leak
         # passwords; as a result we need to see if password changes occurred
         module_sql, all_password_sql_to_run = analyze_attributes(spec, cursor, verbose)
-        run_module_sql(module_sql, cursor, verbose)
+        run_module_sql(module_sql, cursor, live, verbose)
         if all_password_sql_to_run:
             password_changed = True
             run_password_sql(cursor, all_password_sql_to_run)
@@ -137,28 +137,26 @@ def configure(spec_path, host, port, user, password, dbname, prompt, attributes,
     if memberships:
         sql_to_run.append(create_divider('memberships'))
         module_sql = analyze_memberships(spec, cursor, verbose)
-        run_module_sql(module_sql, cursor, verbose)
+        run_module_sql(module_sql, cursor, live, verbose)
         sql_to_run.extend(module_sql)
 
     if ownerships:
         sql_to_run.append(create_divider('ownerships'))
-        module_sql = analyze_ownerships(spec, cursor, verbose)
+        module_sql = analyze_ownerships(spec, cursor, live, verbose)
         run_module_sql(module_sql, cursor, verbose)
         sql_to_run.extend(module_sql)
 
     if privileges:
         sql_to_run.append(create_divider('privileges'))
         module_sql = analyze_privileges(spec, cursor, verbose)
-        run_module_sql(module_sql, cursor, verbose)
+        run_module_sql(module_sql, cursor, live, verbose)
         sql_to_run.extend(module_sql)
 
     changed = password_changed or has_changes(sql_to_run)
     if changed and live:
         logger.debug('Committing changes')
         db_connection.commit()
-    else:
-        db_connection.rollback()
-
+    
     # Make sure there is at least 1 line with a real change (vs. all headers)
     if changed:
         click.secho(HEADER.format('LIVE' if live else 'CHECK'), fg='green')
