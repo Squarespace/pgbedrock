@@ -143,7 +143,7 @@ def configure(spec_path, host, port, user, password, dbname, prompt, attributes,
     if ownerships:
         sql_to_run.append(create_divider('ownerships'))
         module_sql = analyze_ownerships(spec, cursor, live, verbose)
-        run_module_sql(module_sql, cursor, verbose)
+        run_module_sql(module_sql, cursor, live, verbose)
         sql_to_run.extend(module_sql)
 
     if privileges:
