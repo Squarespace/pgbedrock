@@ -34,6 +34,8 @@ UNDOCUMENTED_ROLES_MSG = ('Spec error: Undocumented roles found: {}.\n'
 UNOWNED_SCHEMAS_MSG = ('Spec error: Schemas found in database with no owner in spec: {}\n'
                        'Please add these schemas to the spec file or manually remove '
                        'them from the Postgres cluster')
+RESTRICTED_SCHEMAS_MSG = ('Spec error: Schema found with restrict privilege for role: {}\n'
+                       'Restrict may only be used for tables and sequences ')
 VALIDATION_ERR_MSG = 'Spec error: Role "{}", field "{}": {}'
 
 SPEC_SCHEMA_YAML = """
@@ -447,6 +449,7 @@ def verify_spec(rendered_template, spec, cursor, verbose, attributes, membership
     # so we check this regardless of which submodules are being used
     error_messages += ensure_no_duplicate_roles(rendered_template)
     error_messages += ensure_no_undocumented_roles(spec, dbcontext)
+    error_messages += ensure_no_restrict_on_schema(spec)
 
     if ownerships:
         for objkind in context.PRIVILEGE_MAP.keys():
@@ -465,3 +468,11 @@ def verify_spec(rendered_template, spec, cursor, verbose, attributes, membership
 
     if error_messages:
         common.fail('\n'.join(error_messages))
+
+def ensure_no_restrict_on_schema(spec):
+    error_messages = []
+    for rolename, config in spec.items():
+        if config and config.get('privileges'):
+            if config['privileges'].get('schemas') and config['privileges']['schemas'].get('restrict') and config['privileges']['schemas']['restrict']:
+                error_messages.append(RESTRICTED_SCHEMAS_MSG.format(rolename))
+    return error_messages
