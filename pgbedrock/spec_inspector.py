@@ -77,6 +77,7 @@ SPEC_SCHEMA_YAML = """
             allowed:
                 - read
                 - write
+                - restrict
             valueschema:
                 type: list
                 schema:
@@ -401,7 +402,6 @@ def get_spec_schemas(spec):
             spec_schemas.append(common.ObjectName(rolename))
 
     return set(spec_schemas)
-
 
 def load_spec(spec_path, cursor, verbose, attributes, memberships, ownerships, privileges):
     """ Validate a spec passes various checks and, if so, return the loaded spec. """
