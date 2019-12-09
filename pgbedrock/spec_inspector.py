@@ -35,7 +35,7 @@ UNOWNED_SCHEMAS_MSG = ('Spec error: Schemas found in database with no owner in s
                        'Please add these schemas to the spec file or manually remove '
                        'them from the Postgres cluster')
 RESTRICTED_SCHEMAS_MSG = ('Spec error: Schema found with restrict privilege for role: {}\n'
-                       'Restrict may only be used for tables and sequences ')
+                          'Restrict may only be used for tables and sequences ')
 VALIDATION_ERR_MSG = 'Spec error: Role "{}", field "{}": {}'
 
 SPEC_SCHEMA_YAML = """
