@@ -69,7 +69,7 @@ def analyze_privileges(spec, cursor, verbose):
                                                  dbcontext=dbcontext,
                                                  schema_writers=schema_writers,
                                                  personal_schemas=personal_schemas,
-                                                 restricted_items_this_obj=restricted_items_this_obj)
+                                                 restricted_items=restricted_items_this_obj)
                     role_sql_to_run = privconf.analyze()
                     all_sql_to_run += role_sql_to_run
 
