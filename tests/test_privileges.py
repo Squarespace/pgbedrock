@@ -110,6 +110,13 @@ def test_analyze_privileges(cursor):
                     - schema0
                     - schema1
                     - schema2
+        Role4:
+            privileges:
+                tables:
+                    read:
+                        - schema0.*
+                    restrict:
+                        - schema0.table2 (Role4 can read all tables except for table 2 in schema 0)
     """
     unconverted_desired_spec = yaml.load("""
         {role0}:
