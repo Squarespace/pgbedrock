@@ -7,6 +7,11 @@ and this project tries to adhere to [Semantic Versioning](http://semver.org/spec
 ## [Unreleased]
 _this space intentionally left blank_
 
+## [0.4.0] - 2019-12-10
+### In Code
+- Added the ability to except tables and sequences from privileges when the schemas entire tables
+  or sequences are whitelisted ( @dmoore1989 )
+
 ## [0.3.2] - 2018-08-30
 ### In Code
 - `pgbedrock` is more permissive in its declared dependencies so it plays well
