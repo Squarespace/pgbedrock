@@ -54,7 +54,7 @@ def analyze_privileges(spec, cursor, verbose):
 
             for object_kind in PRIVILEGE_MAP.keys():
                 desired_items_this_obj = all_desired_privs.get(object_kind, {})
-                restricted_items_this_obj = all_desired_privs.get('restrict', {})
+                excepted_items_this_obj = all_desired_privs.get('except', [])
 
                 for access in ('read', 'write'):
                     desired_items = desired_items_this_obj.get(access, [])
@@ -69,7 +69,7 @@ def analyze_privileges(spec, cursor, verbose):
                                                  dbcontext=dbcontext,
                                                  schema_writers=schema_writers,
                                                  personal_schemas=personal_schemas,
-                                                 restricted_items=restricted_items_this_obj)
+                                                 excepted_items=excepted_items_this_obj)
                     role_sql_to_run = privconf.analyze()
                     all_sql_to_run += role_sql_to_run
 
@@ -183,7 +183,7 @@ class PrivilegeAnalyzer(object):
     """
 
     def __init__(self, rolename, access, object_kind, desired_items, schema_writers,
-                 personal_schemas, dbcontext, restricted_items):
+                 personal_schemas, dbcontext, excepted_items):
         log_msg = 'Initializing PrivilegeAnalyzer for rolename "{}", access "{}", and object "{}"'
         logger.debug(log_msg.format(rolename, access, object_kind))
         self.sql_to_run = []
@@ -192,7 +192,7 @@ class PrivilegeAnalyzer(object):
         self.access = access
         self.object_kind = object_kind
         self.desired_items = desired_items
-        self.restricted_items = restricted_items
+        self.excepted_items = excepted_items
         self.schema_writers = schema_writers
         self.personal_schemas = personal_schemas
         self.default_acl_possible = self.object_kind in OBJECTS_WITH_DEFAULTS
@@ -323,8 +323,8 @@ class PrivilegeAnalyzer(object):
             schema_objects = self.get_schema_objects(schema.qualified_name)
             desired_nondefault_objs.update(schema_objects)
 
-        #Remove restricted elements
-        desired_nondefault_objs.difference_update(self.restricted_items)
+        #Remove excepted elements
+        desired_nondefault_objs.difference_update(self.excepted_items)
 
         # Cross our desired objects with the desired privileges
         priv_types = PRIVILEGE_MAP[self.object_kind][self.access]

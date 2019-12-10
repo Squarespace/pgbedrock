@@ -582,7 +582,7 @@ def test_convert_spec_to_objectnames_privileges_subdict():
                         - myschema2.mytable1
                     write:
                         - myschema3.mytable1
-                    restrict:
+                    except:
                         - myschema1.mytable1
         """
 
@@ -606,7 +606,7 @@ def test_convert_spec_to_objectnames_privileges_subdict():
                     'write': [
                         ObjectName('myschema3', 'mytable1'),
                     ],
-                    'restrict': [
+                    'except': [
                         ObjectName('myschema1', 'mytable1'),
                     ],
                 }

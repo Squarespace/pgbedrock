@@ -115,7 +115,7 @@ def test_analyze_privileges(cursor):
                 tables:
                     read:
                         - schema0.*
-                    restrict:
+                    except:
                         - schema0.table2 (Role4 can read all tables except for table 2 in schema 0)
     """
     unconverted_desired_spec = yaml.load("""
@@ -149,7 +149,7 @@ def test_analyze_privileges(cursor):
                 tables:
                     read:
                         - {schema0}.*
-                    restrict:
+                    except:
                         - {schema0}.{table2}
     """.format(role0=ROLES[0], role1=ROLES[1], role2=ROLES[2], role3=ROLES[3], role4=ROLES[4],
                schema0=SCHEMAS[0], schema1=SCHEMAS[1], schema2=SCHEMAS[2], sequence1=SEQUENCES[1],
@@ -212,7 +212,7 @@ def test_analyze_privileges(cursor):
     ])
 
     expected_role4_changes = set([
-        # role4 has read access on schema0 except for table2 (which is restricted)
+        # role4 has read access on schema0 except for table2 (which is excepted)
         privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', quoted_object(SCHEMAS[0], TABLES[0]), ROLES[4]),
         privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', quoted_object(SCHEMAS[0], TABLES[1]), ROLES[4]),
         # Grant default read for sequences in schema2 to role4 from role3 (schema owner)
@@ -257,7 +257,7 @@ def test_init_default_acl_possible(object_kind, mockdbcontext):
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext,
-                                       restricted_items=set())
+                                       excepted_items=[])
     expected = object_kind in privs.OBJECTS_WITH_DEFAULTS
     assert privconf.default_acl_possible is expected
 
@@ -273,7 +273,7 @@ def test_get_schema_objects_tables(mockdbcontext):
 
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind='tables',
                                        desired_items=DUMMY, schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
 
     # Assert that we get back the tables that are in the context object
     actual = privconf.get_schema_objects(SCHEMAS[0])
@@ -294,7 +294,7 @@ def test_get_schema_objects_sequences(mockdbcontext):
 
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind='sequences',
                                        desired_items=DUMMY, schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
     # Assert that we get back the sequences that are in the context object
     actual = privconf.get_schema_objects(SCHEMAS[0])
     expected = set([ObjectName(SCHEMAS[0], seq) for seq in SEQUENCES])
@@ -325,7 +325,7 @@ def test_get_object_owner(mockdbcontext, object_kind, objname, expected):
 
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=DUMMY, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
     actual = privconf.get_object_owner(objname)
     assert actual == expected
 
@@ -336,7 +336,7 @@ def test_get_object_owner_nonexistent_object(capsys, mockdbcontext):
     mockdbcontext.get_all_object_attributes = lambda: {}
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access=DUMMY, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
 
     with pytest.raises(SystemExit):
         privconf.get_object_owner(objname)
@@ -357,7 +357,7 @@ def test_determine_desired_defaults(mockdbcontext):
     schema_writers = {ObjectName(SCHEMAS[0]): set(ROLES[1:])}
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access=access, object_kind=object_kind,
                                        desired_items=DUMMY, schema_writers=schema_writers,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
 
     schemas = [ObjectName(SCHEMAS[0])]
     roles = ROLES[1:]
@@ -412,7 +412,7 @@ def test_identify_desired_objects(rolename, mockdbcontext):
 
     privconf = privs.PrivilegeAnalyzer(rolename, access=access, object_kind=object_kind,
                                        desired_items=desired_items, schema_writers=schema_writers,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
     privconf.identify_desired_objects()
 
     # We don't grant default privileges when the grantor is the role itself because in that case
@@ -465,7 +465,7 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_schema(mockdbc
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=access, object_kind=object_kind,
                                        desired_items=desired_items, schema_writers=DUMMY,
                                        personal_schemas=personal_schemas, dbcontext=mockdbcontext,
-                                       restricted_items=set())
+                                       excepted_items=[])
     privconf.identify_desired_objects()
 
     nonpersonal_expected_schemas = set([ObjectName(SCHEMAS[0]), ObjectName(SCHEMAS[1])])
@@ -519,7 +519,7 @@ def test_identify_desired_objects_personal_schemas_object_kind_is_not_schema(moc
     privconf = privs.PrivilegeAnalyzer(ROLES[0], access=access, object_kind=object_kind,
                                        desired_items=desired_items, schema_writers=schema_writers,
                                        personal_schemas=personal_schemas, dbcontext=mockdbcontext,
-                                       restricted_items=set())
+                                       excepted_items=[])
     privconf.identify_desired_objects()
 
     # Check default privileges
@@ -553,7 +553,7 @@ def test_identify_desired_objects_personal_schemas_error_expected(capsys, mockdb
     privconf = privs.PrivilegeAnalyzer(rolename=DUMMY, access=access, object_kind=object_kind,
                                        desired_items=[ObjectName('personal_schemas')],
                                        schema_writers=DUMMY, personal_schemas=DUMMY,
-                                       dbcontext=mockdbcontext, restricted_items=set())
+                                       dbcontext=mockdbcontext, excepted_items=[])
     with pytest.raises(SystemExit):
         privconf.identify_desired_objects()
     expected_err_msg = privs.PERSONAL_SCHEMAS_ERROR_MSG.format(DUMMY, object_kind, access) + '\n'
@@ -565,7 +565,7 @@ def test_grant_default(mockdbcontext):
     privconf = privs.PrivilegeAnalyzer(rolename=rolename, access='read', object_kind='tables',
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext,
-                                       restricted_items=set())
+                                       excepted_items=[])
 
     # Grant default privileges to role0 from role1 for this schema
     privconf.grant_default(grantor=ROLES[1], schema=ObjectName(SCHEMAS[0]), privilege='SELECT')
@@ -581,7 +581,7 @@ def test_revoke_default(mockdbcontext):
     privconf = privs.PrivilegeAnalyzer(rolename=rolename, access='read', object_kind='tables',
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext,
-                                       restricted_items=set())
+                                       excepted_items=[])
 
     privconf.revoke_default(grantor=ROLES[1], schema=ObjectName(SCHEMAS[0]), privilege='SELECT')
 
@@ -597,7 +597,7 @@ def test_grant_nondefault(mockdbcontext):
     privconf = privs.PrivilegeAnalyzer(rolename=rolename, access=DUMMY, object_kind='tables',
                                        desired_items=DUMMY, schema_writers=DUMMY,
                                        personal_schemas=DUMMY, dbcontext=mockdbcontext,
-                                       restricted_items=set())
+                                       excepted_items=[])
 
     privconf.grant_nondefault(table, 'SELECT')
     expected = [privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', table.qualified_name, rolename)]
@@ -611,7 +611,7 @@ def test_revoke_nondefault(mockdbcontext):
     # Revoke the privilege
     privconf = privs.PrivilegeAnalyzer(rolename=rolename, access=DUMMY, object_kind='tables',
                                        desired_items=DUMMY, schema_writers=DUMMY,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
 
     privconf.revoke_nondefault(table, 'SELECT')
     expected = [privs.Q_REVOKE_NONDEFAULT.format('SELECT', 'TABLE', table.qualified_name, rolename)]
@@ -642,7 +642,7 @@ def test_analyze_defaults(mockdbcontext):
     }
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access='read', object_kind='tables',
                                        desired_items=desired_items, schema_writers=schema_writers,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
 
     # Run analyze_defaults(); note that we have to do identify_desired_objects()
     # first to set things up
@@ -703,7 +703,7 @@ def test_analyze_nondefaults(mockdbcontext):
 
     privconf = privs.PrivilegeAnalyzer(rolename=ROLES[0], access='read', object_kind='tables',
                                        desired_items=desired_items, schema_writers=dummy_schema_writers,
-                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, restricted_items=set())
+                                       personal_schemas=DUMMY, dbcontext=mockdbcontext, excepted_items=[])
 
     expected = set([
         # Grant for schema0.table0
