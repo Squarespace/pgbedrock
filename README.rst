@@ -62,6 +62,8 @@ As an example, the definition for the ``jdoe`` role in the spec might look like 
                     - marketing.impressions
                 write:
                     - reports.*
+                except:
+                    - reports.Q2_fixed_assets
             sequences:
                 write:
                     - reports.*
@@ -84,7 +86,7 @@ When pgbedrock is run, it would make sure that:
       ``marketing.ad_spend`` and ``marketing.impressions`` tables
     * ``jdoe`` has default privileges to read from all future tables created in the ``finance`` schema
     * ``jdoe`` has write-level access (``SELECT``, ``INSERT``, ``UPDATE``, ``DELETE``, ``TRUNCATE``,
-      ``REFERENCES``, and ``TRIGGER``) to all tables in the ``reports`` schema
+      ``REFERENCES``, and ``TRIGGER``) to all tables in the ``reports`` schema except for the ``Q2_fixed_assets`` table
     * ``jdoe`` has default privileges to write to all future tables created in the ``reports`` schema
     * ``jdoe`` has write-level access (``SELECT``, ``USAGE``, ``UPDATE``) to all sequences in the
       ``reports`` schema

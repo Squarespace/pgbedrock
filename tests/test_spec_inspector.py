@@ -582,6 +582,8 @@ def test_convert_spec_to_objectnames_privileges_subdict():
                         - myschema2.mytable1
                     write:
                         - myschema3.mytable1
+                    except:
+                        - myschema1.mytable1
         """
 
     expected_spec = {
@@ -603,6 +605,9 @@ def test_convert_spec_to_objectnames_privileges_subdict():
                     ],
                     'write': [
                         ObjectName('myschema3', 'mytable1'),
+                    ],
+                    'except': [
+                        ObjectName('myschema1', 'mytable1'),
                     ],
                 }
             }
