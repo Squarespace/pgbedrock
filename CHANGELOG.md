@@ -9,6 +9,10 @@ _this space intentionally left blank_
 
 ## [0.4.0] - 2019-12-10
 ### In Code
+- Small fix to ensure docker container deploys with working code.
+
+## [0.4.0] - 2019-12-10
+### In Code
 - Added the ability to except tables and sequences from privileges when the schemas entire tables
   or sequences are whitelisted ( @dmoore1989 )
 
