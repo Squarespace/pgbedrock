@@ -7,7 +7,7 @@ and this project tries to adhere to [Semantic Versioning](http://semver.org/spec
 ## [Unreleased]
 _this space intentionally left blank_
 
-## [0.4.0] - 2019-12-10
+## [0.4.1] - 2019-12-10
 ### In Code
 - Small fix to ensure docker container deploys with working code.
 
