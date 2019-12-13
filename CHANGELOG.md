@@ -7,9 +7,15 @@ and this project tries to adhere to [Semantic Versioning](http://semver.org/spec
 ## [Unreleased]
 _this space intentionally left blank_
 
+## [0.4.2] - 2019-12-13
+### In Code
+- Fixes for new "except" feature introduced in 0.4.0 ( @jholbrook-sqsp )
+- Upgrade PyYAML from 5.1 to 5.2 in requirements.txt ( @dependabot )
+- Patch to remove YAML.load warnings ( @jholbrook-sqsp )
+
 ## [0.4.1] - 2019-12-10
 ### In Code
-- Small fix to ensure docker container deploys with working code.
+- Small fix to ensure docker container deploys with working code. ( @domoore1989 )
 
 ## [0.4.0] - 2019-12-10
 ### In Code
