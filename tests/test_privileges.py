@@ -118,7 +118,7 @@ def test_analyze_privileges(cursor):
                     except:
                         - schema0.table2 (Role4 can read all tables except for table 2 in schema 0)
     """
-    unconverted_desired_spec = yaml.load("""
+    unconverted_desired_spec = yaml.safe_load("""
         {role0}:
             privileges:
                 tables:
@@ -236,7 +236,7 @@ def test_analyze_privileges(cursor):
     attributes.Q_ALTER_ROLE.format(ROLES[0], 'SUPERUSER')
 ])
 def test_analyze_privileges_skips_superuser(cursor):
-    desired_spec = yaml.load("""
+    desired_spec = yaml.safe_load("""
         {role0}:
             privileges:
                 tables:

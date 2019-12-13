@@ -28,7 +28,7 @@ def test_ensure_no_schema_owned_twice():
             schemas:
                 - finance_documents
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_schema_owned_twice(spec)
     expected = spec_inspector.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('finance_documents',
@@ -48,7 +48,7 @@ def test_ensure_no_schema_owned_twice_with_personal_schemas():
             schemas:
                 - jfinance
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_schema_owned_twice(spec)
     expected = spec_inspector.MULTIPLE_SCHEMA_OWNER_ERR_MSG.format('jfinance',
@@ -86,7 +86,7 @@ def test_ensure_no_object_owned_twice(mockdbcontext):
                 - schema1.table1
                 - schema1."table2"
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
     expected = spec_inspector.MULTIPLE_OBJKIND_OWNER_ERR_MSG.format('Table', 'schema1."table1"',
@@ -118,7 +118,7 @@ def test_ensure_no_object_owned_twice_schema_expansion_works(mockdbcontext):
                 - schema1."table1"
                 - schema1.table3
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
     expected = set([
@@ -149,7 +149,7 @@ def test_ensure_no_object_owned_twice_personal_schemas_expanded(mockdbcontext):
                 - role0."table0"
                 - role0.table1
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_object_owned_twice(spec, mockdbcontext, 'tables')
     expected = set([
@@ -182,7 +182,7 @@ def test_ensure_no_missing_objects_missing_in_db(mockdbcontext):
                 - schema0.table3
                 - schema0.table4
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     expected = spec_inspector.UNKNOWN_OBJECTS_MSG.format(objkind='tables',
@@ -218,7 +218,7 @@ def test_ensure_no_missing_objects_missing_in_spec(mockdbcontext):
                 - schema0."table1"
                 - schema0.table3
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     expected = spec_inspector.UNOWNED_OBJECTS_MSG.format(objkind='tables',
@@ -243,7 +243,7 @@ def test_ensure_no_missing_objects_with_personal_schemas(mockdbcontext):
     role0:
         has_personal_schema: true
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     assert errors == []
@@ -268,7 +268,7 @@ def test_ensure_no_missing_objects_schema_expansion_works(mockdbcontext):
             tables:
                 - schema0.*
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_missing_objects(spec, mockdbcontext, 'tables')
     assert errors == []
@@ -293,7 +293,7 @@ def test_ensure_no_dependent_object_is_owned(mockdbcontext):
                 - schema0.table2
                 - schema0.table3
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_dependent_object_is_owned(spec, mockdbcontext, 'tables')
     expected = spec_inspector.DEPENDENT_OBJECTS_MSG.format(objkind='tables',
@@ -317,7 +317,7 @@ def test_ensure_no_dependent_object_is_owned_schema_expansion_skips_deps(mockdbc
             tables:
                 - schema0.*
     """
-    unconverted_spec = yaml.load(spec_yaml)
+    unconverted_spec = yaml.safe_load(spec_yaml)
     spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
     errors = spec_inspector.ensure_no_dependent_object_is_owned(spec, mockdbcontext, 'tables')
     assert errors == []
@@ -345,7 +345,7 @@ def test_verify_spec_fails_object_referenced_read_write():
 
     privilege_types = ('schemas', 'sequences', 'tables')
     for t in privilege_types:
-        unconverted_spec = yaml.load(spec_yaml.format(t))
+        unconverted_spec = yaml.safe_load(spec_yaml.format(t))
         spec = spec_inspector.convert_spec_to_objectnames(unconverted_spec)
         errors = spec_inspector.ensure_no_redundant_privileges(spec)
         err_string = "margerie: {'%s': ['big_bad']}" % t
@@ -383,7 +383,7 @@ def test_ensure_valid_schema_fails():
             attribute:
                 - flub
         """
-    spec = yaml.load(spec_yaml)
+    spec = yaml.safe_load(spec_yaml)
     errors = spec_inspector.ensure_valid_schema(spec)
     expected = spec_inspector.VALIDATION_ERR_MSG.format('fred', 'attribute', 'unknown field')
     assert expected == errors[0]
@@ -397,7 +397,7 @@ def test_ensure_valid_schema_succeeds():
 
         mark:
         """
-    spec = yaml.load(spec_yaml)
+    spec = yaml.safe_load(spec_yaml)
     errors = spec_inspector.ensure_valid_schema(spec)
     assert len(errors) == 0
 
@@ -425,7 +425,7 @@ def test_render_template(tmpdir):
               - service1_schema
     """)
     spec = spec_inspector.render_template(spec_path.strpath)
-    spec = yaml.load(spec)
+    spec = yaml.safe_load(spec)
 
     assert len(spec) == 4
     assert set(spec.keys()) == {'admin', 'my_group', 'service1', 'fred'}
@@ -441,7 +441,7 @@ def test_load_spec_with_templated_variables(tmpdir, set_envvar):
             - PASSWORD: "{{ env['FRED_PASSWORD'] }}"
     """)
     spec = spec_inspector.render_template(spec_path.strpath)
-    spec = yaml.load(spec)
+    spec = yaml.safe_load(spec)
 
     password_option = spec['fred']['options'][0]
     assert password_option['PASSWORD'] == 'a_password'
@@ -561,7 +561,7 @@ def test_convert_spec_to_objectnames_owns_subdict():
             }
         }
     }
-    loaded_spec = yaml.load(yaml_spec)
+    loaded_spec = yaml.safe_load(yaml_spec)
     actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
     assert actual_spec == expected_spec
 
@@ -613,7 +613,7 @@ def test_convert_spec_to_objectnames_privileges_subdict():
             }
         }
     }
-    loaded_spec = yaml.load(yaml_spec)
+    loaded_spec = yaml.safe_load(yaml_spec)
     actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
     assert actual_spec == expected_spec
 
@@ -694,7 +694,7 @@ def test_convert_spec_to_objectnames_other_subdicts_untouched():
             },
         },
     }
-    loaded_spec = yaml.load(yaml_spec)
+    loaded_spec = yaml.safe_load(yaml_spec)
     actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
     assert actual_spec == expected_spec
 
@@ -707,6 +707,6 @@ def test_convert_spec_to_objectnames_empty_role_definition_ok():
     expected_spec = {
         'roleA': None,
     }
-    loaded_spec = yaml.load(yaml_spec)
+    loaded_spec = yaml.safe_load(yaml_spec)
     actual_spec = spec_inspector.convert_spec_to_objectnames(loaded_spec)
     assert actual_spec == expected_spec

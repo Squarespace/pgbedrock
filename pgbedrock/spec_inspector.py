@@ -381,7 +381,7 @@ def ensure_valid_schema(spec):
     """ Ensure spec has no schema errors """
     error_messages = []
 
-    schema = yaml.load(SPEC_SCHEMA_YAML)
+    schema = yaml.safe_load(SPEC_SCHEMA_YAML)
     v = cerberus.Validator(schema)
     for rolename, config in spec.items():
         if not config:
@@ -408,7 +408,7 @@ def get_spec_schemas(spec):
 def print_spec(spec_path):
     """ Validate a spec passes various checks and, if so, return the loaded spec. """
     rendered_template = render_template(spec_path)
-    unconverted_spec = yaml.load(rendered_template)
+    unconverted_spec = yaml.safe_load(rendered_template)
 
     # Validate the schema before verifying anything else about the spec. If the spec is invalid
     # then other checks may fail in erratic ways, so it is better to error out here
@@ -423,7 +423,7 @@ def print_spec(spec_path):
 def load_spec(spec_path, cursor, verbose, attributes, memberships, ownerships, privileges):
     """ Validate a spec passes various checks and, if so, return the loaded spec. """
     rendered_template = render_template(spec_path)
-    unconverted_spec = yaml.load(rendered_template)
+    unconverted_spec = yaml.safe_load(rendered_template)
 
     # Validate the schema before verifying anything else about the spec. If the spec is invalid
     # then other checks may fail in erratic ways, so it is better to error out here
