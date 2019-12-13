@@ -150,10 +150,10 @@ def test_analyze_privileges(cursor):
                     read:
                         - {schema0}.*
                     except:
-                        - {schema0}.{table2}
+                        - {schema0}.{table1}
     """.format(role0=ROLES[0], role1=ROLES[1], role2=ROLES[2], role3=ROLES[3], role4=ROLES[4],
                schema0=SCHEMAS[0], schema1=SCHEMAS[1], schema2=SCHEMAS[2], sequence1=SEQUENCES[1],
-               table2=TABLES[2]))
+               table1=TABLES[1], table2=TABLES[2]))
     desired_spec = spec_inspector.convert_spec_to_objectnames(unconverted_desired_spec)
 
     expected_role0_changes = set([
@@ -212,9 +212,8 @@ def test_analyze_privileges(cursor):
     ])
 
     expected_role4_changes = set([
-        # role4 has read access on schema0 except for table2 (which is excepted)
+        # role4 has read access on schema0 except for table1 (which is excepted)
         privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', quoted_object(SCHEMAS[0], TABLES[0]), ROLES[4]),
-        privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', quoted_object(SCHEMAS[0], TABLES[1]), ROLES[4]),
         # Grant default read for sequences in schema2 to role4 from role3 (schema owner)
         # and role2 (owns all sequences in schema)
         privs.Q_GRANT_DEFAULT.format(ROLES[2], SCHEMAS[0], 'SELECT', 'TABLES', ROLES[4]),

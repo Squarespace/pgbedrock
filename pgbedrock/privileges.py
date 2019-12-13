@@ -54,7 +54,7 @@ def analyze_privileges(spec, cursor, verbose):
 
             for object_kind in PRIVILEGE_MAP.keys():
                 desired_items_this_obj = all_desired_privs.get(object_kind, {})
-                excepted_items_this_obj = all_desired_privs.get('except', [])
+                excepted_items_this_obj = desired_items_this_obj.get('except', [])
 
                 for access in ('read', 'write'):
                     desired_items = desired_items_this_obj.get(access, [])
