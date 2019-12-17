@@ -17,7 +17,7 @@ First, get your Python environment set up:
 .. code-block:: bash
 
     mkvirtualenv pgbedrock3 --python python3
-    pip3 install -e . -r requirements-dev.txt
+    pip3 install -e . -r requirements-dev.txt -r requirements-publish.txt
 
 Note that if the pip install step fails on psycopg2 you may have to do the following:
 
