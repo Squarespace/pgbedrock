@@ -58,13 +58,15 @@ psql:
 release_pypi: test
 	@echo "Releasing Python package to pypi"
 	rm -rf dist/
-	python setup.py sdist bdist_wheel upload -r pypi
+	python setup.py sdist bdist_wheel
+	twine upload -r pypi ./dist/*
 	rm -rf dist/
 
 release_pypitest: test
 	@echo "Releasing Python package to pypitest"
 	rm -rf dist/
-	python setup.py sdist bdist_wheel upload -r pypitest
+	python setup.py sdist bdist_wheel
+	twine upload -r pypitest ./dist/*
 	rm -rf dist/
 
 # Note: you may have to do a `docker login` and/or be added to the
