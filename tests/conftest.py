@@ -67,7 +67,9 @@ def drop_users_and_objects(cursor):
         WHERE rolname NOT IN (
             'test_user', 'postgres', 'pg_signal_backend',
             -- Roles introduced in Postgres 10:
-            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables'
+            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables',
+            -- Roles introduced in Postgres 11:
+            'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files'
         );
         """)
     users = [u[0] for u in cursor.fetchall()]
@@ -96,12 +98,19 @@ def base_spec(cursor):
                 tables:
                     - information_schema.*
                     - pg_catalog.*
+
             privileges:
                 schemas:
                     write:
                         - information_schema
                         - pg_catalog
                         - public
+                tables:
+                    write:
+                        - information_schema.*
+                    except:
+                        - information_schema.pg_replication_origin
+                        - information_schema.sql_languages
 
         test_user:
             attributes:
@@ -112,8 +121,8 @@ def base_spec(cursor):
 
     # Postgres 10 introduces several new roles that we have to account for
     cursor.execute("SELECT substring(version from 'PostgreSQL ([0-9.]*) ') FROM version()")
-    pg_version = cursor.fetchone()[0]
-    if pg_version.startswith('10.'):
+    pg_version = int(cursor.fetchone()[0].split('.')[0])
+    if pg_version >= 10:
         spec += dedent("""
 
             pg_read_all_settings:
@@ -128,6 +137,14 @@ def base_spec(cursor):
                     - pg_stat_scan_tables
                     - pg_read_all_stats
             """)
+    if pg_version >= 11:
+        spec += dedent("""
+            pg_execute_server_program:
+
+            pg_read_server_files:
+
+            pg_write_server_files:
+        """)
 
     return spec
 
