@@ -17,12 +17,14 @@ from pgbedrock.common import ObjectName
 
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
 Q_CREATE_SEQUENCE = 'SET ROLE {}; CREATE SEQUENCE {}.{}; RESET ROLE;'
+Q_CREATE_FUNCTION = 'SET ROLE {}; CREATE FUNCTION {}.{} RETURNS VOID AS $$$$ language SQL; RESET ROLE;'
 Q_HAS_PRIVILEGE = "SELECT has_table_privilege('{}', '{}', 'SELECT');"
 
 SCHEMAS = tuple('schema{}'.format(i) for i in range(4))
 ROLES = tuple('role{}'.format(i) for i in range(5))
 TABLES = tuple('table{}'.format(i) for i in range(6))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
+FUNCTIONS = tuple(['"func"()', '"func"(integer, text)', '"func2"(integer)'])
 DUMMY = 'foo'
 
 
@@ -56,9 +58,15 @@ DUMMY = 'foo'
         Q_CREATE_SEQUENCE.format(ROLES[2], SCHEMAS[2], SEQUENCES[4]),
         Q_CREATE_SEQUENCE.format(ROLES[2], SCHEMAS[2], SEQUENCES[5]),
 
+        # Create functions
+        Q_CREATE_FUNCTION.format(ROLES[2], SCHEMAS[0], FUNCTIONS[0]),
+        Q_CREATE_FUNCTION.format(ROLES[3], SCHEMAS[1], FUNCTIONS[1]),
+
+
         # Grant a couple unwanted default privileges to assert that they will be revoked
         privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[1], 'SELECT', 'TABLES', ROLES[0]),
         privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[1], 'TRIGGER', 'TABLES', ROLES[0]),
+        privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[1], 'EXECUTE', 'FUNCTIONS', ROLES[0]),
 
         # Grant privileges that would come along with the above default privs (i.e. if default
         # SELECT table priv, then grant SELECT to all existing tables)
@@ -66,6 +74,8 @@ DUMMY = 'foo'
         privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', '{}.{}'.format(SCHEMAS[1], TABLES[3]), ROLES[0]),
         privs.Q_GRANT_NONDEFAULT.format('TRIGGER', 'TABLE', '{}.{}'.format(SCHEMAS[1], TABLES[2]), ROLES[0]),
         privs.Q_GRANT_NONDEFAULT.format('TRIGGER', 'TABLE', '{}.{}'.format(SCHEMAS[1], TABLES[3]), ROLES[0]),
+
+        privs.Q_GRANT_NONDEFAULT.format('EXECUTE', 'FUNCTION', '{}.{}'.format(SCHEMAS[1], FUNCTIONS[1]), ROLES[0]),
 
         # Grant a non-default privilege that will be subsumed by a default privilege grant
         privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', '{}.{}'.format(SCHEMAS[0], TABLES[0]), ROLES[0]),
@@ -125,6 +135,9 @@ def test_analyze_privileges(cursor):
                     write:
                         - {schema0}.*
                         - {schema1}.{table2}
+                functions:
+                    read:
+                        - {schema0}.*
         {role1}:
             privileges:
                 sequences:
@@ -164,16 +177,31 @@ def test_analyze_privileges(cursor):
         privs.Q_REVOKE_NONDEFAULT.format('SELECT', 'TABLE', quoted_object(SCHEMAS[1], TABLES[3]), ROLES[0]),
         privs.Q_REVOKE_NONDEFAULT.format('TRIGGER', 'TABLE', quoted_object(SCHEMAS[1], TABLES[3]), ROLES[0]),
 
+        # Revoke EXECUTE on function
+        privs.Q_REVOKE_NONDEFAULT.format('EXECUTE', 'FUNCTION', '{}.{}'.format(SCHEMAS[1], FUNCTIONS[1]), ROLES[0]),
+
         # Revoke default SELECT and TRIGGER privs on tables in schema1 from role0 (granted by role3)
         privs.Q_REVOKE_DEFAULT.format(ROLES[3], SCHEMAS[1], 'SELECT', 'TABLES', ROLES[0]),
         privs.Q_REVOKE_DEFAULT.format(ROLES[3], SCHEMAS[1], 'TRIGGER', 'TABLES', ROLES[0]),
+
+        # Revoke default EXECUTE on functions in schema1 from role0 (granted by role3)
+        privs.Q_REVOKE_DEFAULT.format(ROLES[3], SCHEMAS[1], 'EXECUTE', 'FUNCTIONS', ROLES[0]),
 
         # Grant default read on tables in schema0 to role0 from role3 and role2 (both own objects)
         privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[0], 'SELECT', 'TABLES', ROLES[0]),
         privs.Q_GRANT_DEFAULT.format(ROLES[2], SCHEMAS[0], 'SELECT', 'TABLES', ROLES[0]),
 
+        # Grant default EXECUTE on functions in schema0 from role0 (granted by
+        # role2 and role3)
+        privs.Q_GRANT_DEFAULT.format(ROLES[2], SCHEMAS[0], 'EXECUTE', 'FUNCTIONS', ROLES[0]),
+        privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[0], 'EXECUTE', 'FUNCTIONS', ROLES[0]),
+
+
+
         # Grant read on all tables in schema0 except schema0.table0 (it already has read)
         privs.Q_GRANT_NONDEFAULT.format('SELECT', 'TABLE', quoted_object(SCHEMAS[0], TABLES[1]), ROLES[0]),
+        # Grant execute on all functions in schema 0
+        privs.Q_GRANT_NONDEFAULT.format('EXECUTE', 'FUNCTION', '{}.{}'.format(SCHEMAS[0], FUNCTIONS[0]), ROLES[0]),
     ]
 
         # Grant write on schema1.table2 to role0 (already has SELECT and TRIGGER)

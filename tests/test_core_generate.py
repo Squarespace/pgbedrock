@@ -15,6 +15,7 @@ from pgbedrock import privileges as privs
 
 
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
+Q_CREATE_FUNCTION = 'SET ROLE {}; CREATE FUNCTION {}.{} RETURNS VOID AS $$$$ language SQL; RESET ROLE;'
 Q_CREATE_SEQUENCE = 'SET ROLE {}; CREATE SEQUENCE {}.{}; RESET ROLE;'
 
 VALID_FOREVER_VALUES = (
@@ -389,8 +390,13 @@ def test_collapse_personal_schemas_empty_schema_with_default_priv(cursor):
     # Create objects in schema0 and grant write access on all of them to role0
     Q_CREATE_TABLE.format('role1', 'schema0', 'table0'),
     Q_CREATE_TABLE.format('role1', 'schema0', 'table1'),
+    Q_CREATE_FUNCTION.format('role1', 'schema0', '"f1"(id integer)'),
+    Q_CREATE_FUNCTION.format('role1', 'schema1', '"f1"(id integer)'),
+    Q_CREATE_FUNCTION.format('role1', 'schema1', '"f2"(id integer)'),
     privs.Q_GRANT_NONDEFAULT.format('INSERT', 'TABLE', 'schema0.table0', 'role0'),
     privs.Q_GRANT_NONDEFAULT.format('INSERT', 'TABLE', 'schema0.table1', 'role0'),
+    privs.Q_GRANT_NONDEFAULT.format('EXECUTE', 'FUNCTION', 'schema0.f1(id integer)', 'role0'),
+    privs.Q_GRANT_NONDEFAULT.format('EXECUTE', 'FUNCTION', 'schema1.f1(id integer)', 'role0'),
 
     # Create one schema owned by role0
     own.Q_CREATE_SCHEMA.format('schema3', 'role0'),
@@ -411,6 +417,10 @@ def test_add_privileges(cursor):
                 'tables': {
                     'write': set([ObjectName('schema0', '*')]),
                 },
+                'functions': {
+                    'read': set([ObjectName('schema0',  '*'),
+                                 ObjectName('schema1', 'f1', '(id integer)')])
+                }
             },
         },
     }

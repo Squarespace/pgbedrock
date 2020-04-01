@@ -10,6 +10,7 @@ import traceback
 
 import click
 import psycopg2
+import re
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ DATABASE_CONNECTION_ERROR_MSG = 'Unable to connect to database. Postgres traceba
 FAILED_QUERY_MSG = 'Failed to execute query "{}": {}'
 UNSUPPORTED_CHAR_MSG = 'Role "{}" contains an unsupported character: \' or "'
 PROGRESS_TEMPLATE = '%(label)s  [%(bar)s]  %(info)s'
+FUNCTION_PARSING_RE = re.compile('^("[^"]+"|[^(]+)((.*))$')
 
 
 def check_name(name):
@@ -76,11 +78,12 @@ class ObjectName(object):
         * Be sure that when we get the fully-qualified name it will be double quoted
             properly, i.e.  "myschema"."mytable"
     """
-    def __init__(self, schema, unqualified_name=None):
+    def __init__(self, schema, unqualified_name=None, object_args=None):
         # Make sure schema and table are both stored without double quotes around
         # them; we add these when ObjectName.qualified_name is called
         self._schema = self._unquoted_item(schema)
         self._unqualified_name = self._unquoted_item(unqualified_name)
+        self._object_args = object_args or ''
 
         if self._unqualified_name and self._unqualified_name == '*':
             self._qualified_name = '{}.{}'.format(self.schema, self.unqualified_name)
@@ -88,12 +91,16 @@ class ObjectName(object):
             # Note that if we decide to support "schema"."table" within YAML that we'll need to
             # add a custom constructor since otherwise YAML gets confused unless you do
             # '"schema"."table"'
-            self._qualified_name = '{}."{}"'.format(self.schema, self.unqualified_name)
+            self._qualified_name = '{}."{}"{}'.format(self.schema,
+                                                      self.unqualified_name,
+                                                      self.object_args)
         else:
             self._qualified_name = '{}'.format(self.schema)
 
     def __eq__(self, other):
-        return (self.schema == other.schema) and (self.unqualified_name == other.unqualified_name)
+        return ((self.schema == other.schema) and 
+                (self.unqualified_name == other.unqualified_name) and
+                (self.object_args == other.object_args))
 
     def __hash__(self):
         return hash(self.qualified_name)
@@ -103,12 +110,17 @@ class ObjectName(object):
 
     def __repr__(self):
         if self.unqualified_name:
-            return "ObjectName('{}', '{}')".format(self.schema, self.unqualified_name)
-
+            if self.object_args:
+                return "ObjectName('{}', '{}', '{}')".format(self.schema,
+                                                             self.unqualified_name,
+                                                             self.object_args)
+            else:
+                return "ObjectName('{}', '{}')".format(self.schema,
+                                                       self.unqualified_name)
         return "ObjectName('{}')".format(self.schema)
 
     @classmethod
-    def from_str(cls, text):
+    def from_str(cls, text, kind=None):
         """ Convert a text representation of a qualified object name into an ObjectName instance
 
         For example, 'foo.bar', '"foo".bar', '"foo"."bar"', etc. will be converted an object with
@@ -123,8 +135,14 @@ class ObjectName(object):
         # If there are multiple periods we assume that the first one delineates the schema from
         # the rest of the object, i.e. foo.bar.baz means schema foo and object "bar.baz"
         schema, unqualified_name = text.split('.', 1)
+        object_args = None
+        if kind == 'functions' and unqualified_name != '*':
+            groups = FUNCTION_PARSING_RE.match(unqualified_name).groups()
+            if len(groups) == 2:
+                unqualified_name, object_args = groups
         # Don't worry about removing double quotes as that happens in __init__
-        return cls(schema=schema, unqualified_name=unqualified_name)
+        return cls(schema=schema, unqualified_name=unqualified_name,
+                   object_args=object_args)
 
     def only_schema(self):
         """ Return an ObjectName instance for the schema associated with the current object """
@@ -133,6 +151,10 @@ class ObjectName(object):
     @property
     def schema(self):
         return self._schema
+
+    @property
+    def object_args(self):
+        return self._object_args
 
     @property
     def unqualified_name(self):

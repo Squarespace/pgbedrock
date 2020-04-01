@@ -64,6 +64,7 @@ SPEC_SCHEMA_YAML = """
             - schemas
             - tables
             - sequences
+            - functions
         valueschema:
             type: list
             schema:
@@ -74,6 +75,7 @@ SPEC_SCHEMA_YAML = """
             - schemas
             - sequences
             - tables
+            - functions
         valueschema:
             type: dict
             allowed:
@@ -103,14 +105,14 @@ def convert_spec_to_objectnames(spec):
         for objkind, owned_items in config.get('owns', {}).items():
             if not owned_items:
                 continue
-            converted = [common.ObjectName.from_str(item) for item in owned_items]
+            converted = [common.ObjectName.from_str(item, objkind) for item in owned_items]
             config['owns'][objkind] = converted
 
         for objkind, perm_dicts in config.get('privileges', {}).items():
             for priv_kind, granted_items in perm_dicts.items():
                 if not granted_items:
                     continue
-                converted = [common.ObjectName.from_str(item) for item in granted_items]
+                converted = [common.ObjectName.from_str(item, objkind) for item in granted_items]
                 config['privileges'][objkind][priv_kind] = converted
 
     return output_spec

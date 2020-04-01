@@ -7,12 +7,14 @@ from pgbedrock import memberships
 
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
 Q_CREATE_SEQUENCE = 'SET ROLE {}; CREATE SEQUENCE {}.{}; RESET ROLE;'
+Q_CREATE_FUNCTION = 'SET ROLE {}; CREATE FUNCTION {}.{} RETURNS VOID AS $$$$ language SQL; RESET ROLE;'
 Q_HAS_PRIVILEGE = "SELECT has_table_privilege('{}', '{}', 'SELECT');"
 
 SCHEMAS = tuple('schema{}'.format(i) for i in range(4))
 ROLES = tuple('role{}'.format(i) for i in range(4))
 TABLES = tuple('table{}'.format(i) for i in range(6))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
+FUNCTIONS = tuple(['func()', 'func(int, text)', 'func2(int)'])
 DUMMY = 'foo'
 
 
@@ -32,6 +34,10 @@ DUMMY = 'foo'
         # Grant default privileges to role0 from role3 for this schema; these should get
         # revoked in our test
         privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[0], 'SELECT', 'TABLES', ROLES[0]),
+
+        # Add some functions
+        Q_CREATE_FUNCTION.format(ROLES[2], SCHEMAS[0], FUNCTIONS[0]),
+        Q_CREATE_FUNCTION.format(ROLES[2], SCHEMAS[0], FUNCTIONS[1]),
     ]
 )
 def test_get_all_current_defaults(cursor):
@@ -325,11 +331,14 @@ def test_get_all_role_attributes(cursor):
     expected = set(['test_user', 'postgres', ROLES[0], ROLES[1]])
     pg_version = dbcontext.get_version_info().postgres_version
     # Postgres 10 introduces several new roles that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 100000:
         expected.update(set([
             'pg_read_all_settings', 'pg_stat_scan_tables', 'pg_read_all_stats', 'pg_monitor']
         ))
-
+    if pg_version >= 110000:
+        expected.update(set([
+            'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files']
+        ))
     actual = dbcontext.get_all_role_attributes()
     assert set(actual.keys()) == expected
 
@@ -422,7 +431,7 @@ def test_get_all_memberships(cursor):
     expected = set([('role1', 'role0'), ('role2', 'role1')])
     pg_version = dbcontext.get_version_info().postgres_version
     # Postgres 10 introduces several new roles and memberships that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 100000:
         expected.update(set([
             ('pg_monitor', 'pg_stat_scan_tables'),
             ('pg_monitor', 'pg_read_all_stats'),
