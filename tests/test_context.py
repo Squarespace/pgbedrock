@@ -325,11 +325,14 @@ def test_get_all_role_attributes(cursor):
     expected = set(['test_user', 'postgres', ROLES[0], ROLES[1]])
     pg_version = dbcontext.get_version_info().postgres_version
     # Postgres 10 introduces several new roles that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 100000:
         expected.update(set([
             'pg_read_all_settings', 'pg_stat_scan_tables', 'pg_read_all_stats', 'pg_monitor']
         ))
-
+    if pg_version >= 110000:
+        expected.update(set([
+            'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files']
+        ))
     actual = dbcontext.get_all_role_attributes()
     assert set(actual.keys()) == expected
 
@@ -422,7 +425,7 @@ def test_get_all_memberships(cursor):
     expected = set([('role1', 'role0'), ('role2', 'role1')])
     pg_version = dbcontext.get_version_info().postgres_version
     # Postgres 10 introduces several new roles and memberships that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 100000:
         expected.update(set([
             ('pg_monitor', 'pg_stat_scan_tables'),
             ('pg_monitor', 'pg_read_all_stats'),

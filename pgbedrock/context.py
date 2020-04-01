@@ -209,10 +209,9 @@ Q_GET_ALL_PERSONAL_SCHEMAS = """
 
 Q_GET_VERSIONS = """
     SELECT
-        substring(version from 'PostgreSQL ([0-9.]*) ') AS postgres_version,
-        substring(version from 'Redshift ([0-9.]*)') AS redshift_version,
-        version LIKE '%Redshift%' AS is_redshift
-    FROM version()
+        current_setting('server_version_num')::int as postgres_version,
+        substring(version() from 'Redshift ([0-9.]*)') AS redshift_version,
+        version() LIKE '%Redshift%' AS is_redshift
     ;
 """
 
