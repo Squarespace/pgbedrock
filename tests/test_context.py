@@ -7,12 +7,14 @@ from pgbedrock import memberships
 
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
 Q_CREATE_SEQUENCE = 'SET ROLE {}; CREATE SEQUENCE {}.{}; RESET ROLE;'
+Q_CREATE_FUNCTION = 'SET ROLE {}; CREATE FUNCTION {}.{} RETURNS VOID AS $$$$ language SQL; RESET ROLE;'
 Q_HAS_PRIVILEGE = "SELECT has_table_privilege('{}', '{}', 'SELECT');"
 
 SCHEMAS = tuple('schema{}'.format(i) for i in range(4))
 ROLES = tuple('role{}'.format(i) for i in range(4))
 TABLES = tuple('table{}'.format(i) for i in range(6))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
+FUNCTIONS = tuple(['func()', 'func(int, text)', 'func2(int)'])
 DUMMY = 'foo'
 
 
@@ -32,6 +34,10 @@ DUMMY = 'foo'
         # Grant default privileges to role0 from role3 for this schema; these should get
         # revoked in our test
         privs.Q_GRANT_DEFAULT.format(ROLES[3], SCHEMAS[0], 'SELECT', 'TABLES', ROLES[0]),
+
+        # Add some functions
+        Q_CREATE_FUNCTION.format(ROLES[2], SCHEMAS[0], FUNCTIONS[0]),
+        Q_CREATE_FUNCTION.format(ROLES[2], SCHEMAS[0], FUNCTIONS[1]),
     ]
 )
 def test_get_all_current_defaults(cursor):

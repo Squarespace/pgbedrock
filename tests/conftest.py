@@ -98,6 +98,9 @@ def base_spec(cursor):
                 tables:
                     - information_schema.*
                     - pg_catalog.*
+                functions:
+                    - pg_catalog.*
+                    - information_schema.*
             privileges:
                 schemas:
                     write:

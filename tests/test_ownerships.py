@@ -7,11 +7,13 @@ from pgbedrock.context import ObjectInfo
 Q_CREATE_SEQUENCE = 'SET ROLE {}; CREATE SEQUENCE {}.{}; RESET ROLE;'
 Q_CREATE_TABLE = 'SET ROLE {}; CREATE TABLE {}.{} AS (SELECT 1+1); RESET ROLE;'
 Q_SCHEMA_EXISTS = "SELECT schema_name FROM information_schema.schemata WHERE schema_name='{}';"
+Q_CREATE_FUNCTION = 'SET ROLE {}; CREATE FUNCTION {}.{} RETURNS VOID AS $$$$ language SQL; RESET ROLE;'
 
 ROLES = tuple('role{}'.format(i) for i in range(3))
 SCHEMAS = tuple('schema{}'.format(i) for i in range(3))
 TABLES = tuple('table{}'.format(i) for i in range(4))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(4))
+FUNCTIONS = tuple(['"func"()', '"func"(integer, text)', '"func2"(integer)'])
 DUMMY = 'foo'
 
 
@@ -59,6 +61,12 @@ def test_analyze_ownerships_create_schemas(cursor):
     Q_CREATE_TABLE.format(ROLES[1], SCHEMAS[0], TABLES[2]),
     Q_CREATE_TABLE.format(ROLES[0], SCHEMAS[0], TABLES[3]),
 
+    # Create functions in SCHEMAS[0], some of which aren't owned by ROLES[0]
+    Q_CREATE_FUNCTION.format(ROLES[0], SCHEMAS[0], FUNCTIONS[0]),
+    Q_CREATE_FUNCTION.format(ROLES[1], SCHEMAS[0], FUNCTIONS[1]),
+    Q_CREATE_FUNCTION.format(ROLES[0], SCHEMAS[0], FUNCTIONS[2]),
+
+
     # Create two sequences in SCHEMAS[1], one of which isn't owned by ROLES[1]
     Q_CREATE_SEQUENCE.format(ROLES[1], SCHEMAS[1], SEQUENCES[0]),
     Q_CREATE_SEQUENCE.format(ROLES[0], SCHEMAS[1], SEQUENCES[1]),
@@ -67,7 +75,8 @@ def test_analyze_ownerships_nonschemas(cursor):
     spec = {
         ROLES[0]: {
             'owns': {
-                'tables': [ObjectName(SCHEMAS[0], '*')]
+                'tables': [ObjectName(SCHEMAS[0], '*')],
+                'functions': [ObjectName(SCHEMAS[0], '*')],
             },
         },
         ROLES[1]: {
@@ -88,6 +97,8 @@ def test_analyze_ownerships_nonschemas(cursor):
                                       ROLES[0], ROLES[1]),
         own.Q_SET_OBJECT_OWNER.format('SEQUENCE', quoted_object(SCHEMAS[1], SEQUENCES[1]),
                                       ROLES[1], ROLES[0]),
+        own.Q_SET_OBJECT_OWNER.format('FUNCTION', '{}.{}'.format(SCHEMAS[0], FUNCTIONS[1]),
+                                      ROLES[0], ROLES[1]),
     ])
     assert set(actual) == expected
 

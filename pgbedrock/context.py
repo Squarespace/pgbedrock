@@ -59,6 +59,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
         SELECT
             nsp.nspname AS schema,
             c.relname AS unqualified_name,
+            NULL::text AS object_args,
             map.objkind,
             (aclexplode(c.relacl)).grantee AS grantee_oid,
             t_owner.rolname AS owner,
@@ -78,6 +79,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
         SELECT
              nsp.nspname AS schema,
              NULL::TEXT AS unqualified_name,
+             NULL::text AS object_args,
              'schemas'::TEXT AS objkind,
              (aclexplode(nsp.nspacl)).grantee AS grantee_oid,
              t_owner.rolname AS owner,
@@ -85,18 +87,34 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
         FROM pg_namespace nsp
         JOIN pg_authid t_owner
             ON nsp.nspowner = t_owner.OID
+    ), functions AS (
+        SELECT
+            nsp.nspname AS schema,
+            proname AS unqualified_name,
+            '(' || pg_get_function_identity_arguments(p.oid) || ')' AS object_args,
+            'functions'::TEXT as objkind,
+            (aclexplode(p.proacl)).grantee AS grantee_oid,
+            t_owner.rolname AS owner,
+            (aclexplode(p.proacl)).privilege_type
+          FROM pg_proc p
+          JOIN pg_namespace nsp on nsp.oid = pronamespace
+          JOIN pg_authid t_owner ON p.proowner = t_owner.oid
     ), combined AS (
         SELECT *
         FROM tables_and_sequences
         UNION ALL
         SELECT *
         FROM schemas
+        UNION ALL
+        SELECT *
+        FROM functions
     )
     SELECT
         t_grantee.rolname AS grantee,
         combined.objkind,
         combined.schema,
         combined.unqualified_name,
+        combined.object_args,
         combined.privilege_type
     FROM
         combined
@@ -149,6 +167,7 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
             map.kind,
             nsp.nspname AS schema,
             c.relname AS unqualified_name,
+            NULL::TEXT AS object_args,
             c.relowner AS owner_id,
             -- Auto-dependency means that a sequence is linked to a table. Ownership of
             -- that sequence automatically derives from the table's ownership
@@ -174,20 +193,35 @@ Q_GET_ALL_RAW_OBJECT_ATTRIBUTES = """
             'schemas'::TEXT AS kind,
             nsp.nspname AS schema,
             NULL::TEXT AS unqualified_name,
+            NULL::TEXT AS object_args,
             nsp.nspowner AS owner_id,
             FALSE AS is_dependent
         FROM pg_namespace nsp
+    ), functions AS (
+        SELECT
+            'functions'::TEXT as kind,
+            nsp.nspname AS schema,
+            proname as unqualified_name,
+            '(' || pg_get_function_identity_arguments(p.oid) || ')' as object_args,
+            p.proowner as owner_id,
+            FALSE AS is_dependent
+        FROM pg_proc p
+        JOIN pg_namespace nsp on nsp.oid = pronamespace
     ), combined AS (
         SELECT *
         FROM tables_and_sequences
         UNION ALL
         SELECT *
         FROM schemas
+        UNION ALL
+        SELECT *
+        FROM functions
     )
     SELECT
         co.kind,
         co.schema,
         co.unqualified_name,
+        co.object_args,
         t_owner.rolname AS owner,
         co.is_dependent
     FROM combined AS co
@@ -230,6 +264,9 @@ PRIVILEGE_MAP = {
         {'read':  ('USAGE', ),
          'write': ('CREATE', )
          },
+    'functions':
+        {'read': ('EXECUTE', ),
+         'write': ()}
 }
 
 ObjectInfo = namedtuple('ObjectInfo', ['kind', 'objname', 'owner', 'is_dependent'])
@@ -375,7 +412,8 @@ class DatabaseContext(object):
             This will not include privileges granted by this role to itself
         """
         NamedRow = namedtuple('NamedRow',
-                              ['grantee', 'objkind', 'schema', 'unqualified_name', 'privilege'])
+                              ['grantee', 'objkind', 'schema',
+                               'unqualified_name', 'object_args', 'privilege'])
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_CURRENT_NONDEFAULTS)
         current_nondefaults = defaultdict(dict)
 
@@ -391,8 +429,9 @@ class DatabaseContext(object):
                     'read': set(),
                     'write': set(),
                 }
-
-            objname = common.ObjectName(schema=row.schema, unqualified_name=row.unqualified_name)
+            objname = common.ObjectName(schema=row.schema,
+                                        unqualified_name=row.unqualified_name,
+                                        object_args=row.object_args)
             entry = (objname, row.privilege)
             role_nondefaults[row.objkind][access_key].add(entry)
 
@@ -435,10 +474,13 @@ class DatabaseContext(object):
         """
         common.run_query(self.cursor, self.verbose, Q_GET_ALL_RAW_OBJECT_ATTRIBUTES)
         results = []
-        NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'unqualified_name', 'owner', 'is_dependent'])
+        NamedRow = namedtuple('NamedRow', ['kind', 'schema', 'unqualified_name',
+                                           'object_args', 'owner', 'is_dependent'])
         for i in self.cursor.fetchall():
             row = NamedRow(*i)
-            objname = common.ObjectName(schema=row.schema, unqualified_name=row.unqualified_name)
+            objname = common.ObjectName(schema=row.schema,
+                                        unqualified_name=row.unqualified_name,
+                                        object_args=row.object_args)
             entry = ObjectAttributes(row.kind, row.schema, objname, row.owner, row.is_dependent)
             results.append(entry)
         return results
