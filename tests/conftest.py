@@ -67,7 +67,9 @@ def drop_users_and_objects(cursor):
         WHERE rolname NOT IN (
             'test_user', 'postgres', 'pg_signal_backend',
             -- Roles introduced in Postgres 10:
-            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables'
+            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables',
+            -- Roles introduced in Postgres 11:
+            'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files'
         );
         """)
     users = [u[0] for u in cursor.fetchall()]
