@@ -67,7 +67,9 @@ def drop_users_and_objects(cursor):
         WHERE rolname NOT IN (
             'test_user', 'postgres', 'pg_signal_backend',
             -- Roles introduced in Postgres 10:
-            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables'
+            'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables',
+            -- Roles introduced in Postgres 11:
+            'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files'
         );
         """)
     users = [u[0] for u in cursor.fetchall()]
@@ -79,42 +81,64 @@ def drop_users_and_objects(cursor):
 @pytest.fixture
 def base_spec(cursor):
     """ A spec with the existing state of the test database before anything has been done """
-    spec = dedent("""
-        postgres:
-            attributes:
-                - BYPASSRLS
-                - CREATEDB
-                - CREATEROLE
-                - REPLICATION
-            can_login: true
-            is_superuser: true
-            owns:
-                schemas:
-                    - information_schema
-                    - pg_catalog
-                    - public
-                tables:
-                    - information_schema.*
-                    - pg_catalog.*
-            privileges:
-                schemas:
-                    write:
+    cursor.execute("SELECT substring(version from 'PostgreSQL ([0-9.]*) ') FROM version()")
+    pg_version = int(cursor.fetchone()[0].split('.')[0])
+    spec = ""
+
+    # Before version 10 Postgres creates a `postgres` user plus the `test_user`
+    if pg_version <= 10:
+        spec += dedent("""
+            postgres:
+                attributes:
+                    - BYPASSRLS
+                    - CREATEDB
+                    - CREATEROLE
+                    - REPLICATION
+                can_login: true
+                is_superuser: true
+                owns:
+                    schemas:
                         - information_schema
                         - pg_catalog
                         - public
+                    tables:
+                        - information_schema.*
+                        - pg_catalog.*
+                privileges:
+                    schemas:
+                        write:
+                            - information_schema
+                            - pg_catalog
+                            - public
 
-        test_user:
-            attributes:
-                - PASSWORD "test_password"
-            can_login: yes
-            is_superuser: yes
+            test_user:
+                attributes:
+                    - PASSWORD "test_password"
+                can_login: yes
+                is_superuser: yes
+            """)
+
+    # In version 10 we have some more roles to deal with
+    if pg_version == 10:
+        spec += dedent("""
+            pg_monitor:
+                member_of:
+                    - pg_read_all_settings
+                    - pg_read_all_stats
+                    - pg_stat_scan_tables
+
+            pg_read_all_settings:
+
+            pg_read_all_stats:
+
+            pg_stat_scan_tables:
         """)
 
-    # Postgres 10 introduces several new roles that we have to account for
-    cursor.execute("SELECT substring(version from 'PostgreSQL ([0-9.]*) ') FROM version()")
-    pg_version = cursor.fetchone()[0]
-    if pg_version.startswith('10.'):
-        spec += dedent("""
+    # In version 11 and onwards Posgres only creates the `test_user` we specify
+    # Postgres 11 introduces several new roles that we have to account for
+    if pg_version >= 11:
+        spec = dedent("""
+            pg_execute_server_program:
 
             pg_read_all_settings:
 
@@ -127,7 +151,35 @@ def base_spec(cursor):
                     - pg_read_all_settings
                     - pg_stat_scan_tables
                     - pg_read_all_stats
-            """)
+
+            pg_read_server_files:
+
+            pg_write_server_files:
+
+            test_user:
+                attributes:
+                    - BYPASSRLS
+                    - CREATEDB
+                    - CREATEROLE
+                    - PASSWORD "test_password"
+                    - REPLICATION
+                can_login: true
+                is_superuser: true
+                owns:
+                    schemas:
+                        - information_schema
+                        - pg_catalog
+                        - public
+                    tables:
+                        - information_schema.*
+                        - pg_catalog.*
+                privileges:
+                    schemas:
+                        write:
+                            - information_schema
+                            - pg_catalog
+                            - public
+        """)
 
     return spec
 
@@ -141,7 +193,7 @@ def spec_with_new_user(tmpdir, base_spec):
         {new_user}:
             has_personal_schema: yes
             member_of:
-                - postgres
+                - test_user
             privileges:
                 tables:
                     read:

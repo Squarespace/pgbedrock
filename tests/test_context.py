@@ -14,6 +14,8 @@ ROLES = tuple('role{}'.format(i) for i in range(4))
 TABLES = tuple('table{}'.format(i) for i in range(6))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
 DUMMY = 'foo'
+TEST_USER='test_user'
+POSTGRES_USER='postgres'
 
 
 @run_setup_sql(
@@ -322,12 +324,25 @@ def test_get_all_personal_schemas(cursor):
 def test_get_all_role_attributes(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
 
-    expected = set(['test_user', 'postgres', ROLES[0], ROLES[1]])
-    pg_version = dbcontext.get_version_info().postgres_version
+    expected = set(['test_user', ROLES[0], ROLES[1]])
+
+    pg_version = int(dbcontext.get_version_info().postgres_version.split('.')[0])
+
+    if pg_version <= 10:
+        expected.update(set([
+            'postgres']
+        ))
+
     # Postgres 10 introduces several new roles that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 10:
         expected.update(set([
             'pg_read_all_settings', 'pg_stat_scan_tables', 'pg_read_all_stats', 'pg_monitor']
+        ))
+
+    # Postgres 11 introduces several new roles that we have to account for
+    if pg_version >= 11:
+        expected.update(set([
+            'pg_read_server_files', 'pg_write_server_files', 'pg_execute_server_program']
         ))
 
     actual = dbcontext.get_all_role_attributes()
@@ -385,15 +400,18 @@ def test_is_superuser(all_role_attributes, expected):
     ])
 def test_get_all_schemas_and_owners(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
+    pg_version = int(dbcontext.get_version_info().postgres_version.split('.')[0])
+
+    expected_owner = TEST_USER if pg_version >= 11 else POSTGRES_USER
     expected = {
         common.ObjectName(SCHEMAS[0]): ROLES[0],
         common.ObjectName(SCHEMAS[1]): ROLES[0],
         common.ObjectName(SCHEMAS[2]): ROLES[1],
         common.ObjectName(ROLES[1]): ROLES[1],
         # These already existed
-        common.ObjectName('public'): 'postgres',
-        common.ObjectName('information_schema'): 'postgres',
-        common.ObjectName('pg_catalog'): 'postgres',
+        common.ObjectName('public'): expected_owner,
+        common.ObjectName('information_schema'): expected_owner,
+        common.ObjectName('pg_catalog'): expected_owner,
     }
 
     actual = dbcontext.get_all_schemas_and_owners()
@@ -420,9 +438,10 @@ def test_get_all_memberships(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
 
     expected = set([('role1', 'role0'), ('role2', 'role1')])
-    pg_version = dbcontext.get_version_info().postgres_version
+    pg_version = int(dbcontext.get_version_info().postgres_version.split('.')[0])
+
     # Postgres 10 introduces several new roles and memberships that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 10:
         expected.update(set([
             ('pg_monitor', 'pg_stat_scan_tables'),
             ('pg_monitor', 'pg_read_all_stats'),

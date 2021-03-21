@@ -22,6 +22,18 @@ jobs:
           script: sudo make test
 
         - stage: # Intentionally left blank to parallelize
+          env: SUPPORTED_PG_VERSIONS=11.11
+          script: sudo make test
+
+        - stage: # Intentionally left blank to parallelize
+          env: SUPPORTED_PG_VERSIONS=12.6
+          script: sudo make test
+
+        - stage: # Intentionally left blank to parallelize
+          env: SUPPORTED_PG_VERSIONS=13.2
+          script: sudo make test
+
+        - stage: # Intentionally left blank to parallelize
           install: pip install -e . -r requirements-docs.txt
           script: make docs
 
