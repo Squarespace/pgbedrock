@@ -324,12 +324,25 @@ def test_get_all_personal_schemas(cursor):
 def test_get_all_role_attributes(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
 
-    expected = set(['test_user', 'postgres', ROLES[0], ROLES[1]])
-    pg_version = dbcontext.get_version_info().postgres_version
+    expected = set(['test_user', ROLES[0], ROLES[1]])
+
+    pg_version = int(dbcontext.get_version_info().postgres_version.split('.')[0])
+
+    if pg_version <= 10:
+        expected.update(set([
+            'postgres']
+        ))
+
     # Postgres 10 introduces several new roles that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 10:
         expected.update(set([
             'pg_read_all_settings', 'pg_stat_scan_tables', 'pg_read_all_stats', 'pg_monitor']
+        ))
+
+    # Postgres 11 introduces several new roles that we have to account for
+    if pg_version >= 11:
+        expected.update(set([
+            'pg_read_server_files', 'pg_write_server_files', 'pg_execute_server_program']
         ))
 
     actual = dbcontext.get_all_role_attributes()
