@@ -78,7 +78,7 @@ def test_configure_live_mode_works(capsys, cursor, spec_with_new_user, db_config
     assert cursor.rowcount == expected
 
     if live_mode:
-        cursor.execute(Q_HAS_ROLE.format(NEW_USER, 'postgres'))
+        cursor.execute(Q_HAS_ROLE.format(NEW_USER, 'test_user'))
         assert cursor.rowcount == expected
 
         cursor.execute(Q_HAS_PRIVILEGE.format(NEW_USER, 'pg_catalog.pg_class'))
