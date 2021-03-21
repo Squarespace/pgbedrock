@@ -81,43 +81,45 @@ def drop_users_and_objects(cursor):
 @pytest.fixture
 def base_spec(cursor):
     """ A spec with the existing state of the test database before anything has been done """
-    spec = dedent("""
-        postgres:
-            attributes:
-                - BYPASSRLS
-                - CREATEDB
-                - CREATEROLE
-                - REPLICATION
-            can_login: true
-            is_superuser: true
-            owns:
-                schemas:
-                    - information_schema
-                    - pg_catalog
-                    - public
-                tables:
-                    - information_schema.*
-                    - pg_catalog.*
-            privileges:
-                schemas:
-                    write:
+    cursor.execute("SELECT substring(version from 'PostgreSQL ([0-9.]*) ') FROM version()")
+    pg_version = int(cursor.fetchone()[0].split('.')[0])
+
+    # Before version 10 Postgres creates a `postgres` user plus the `test_user`
+    if pg_version <= 9:
+        spec = dedent("""
+            postgres:
+                attributes:
+                    - BYPASSRLS
+                    - CREATEDB
+                    - CREATEROLE
+                    - REPLICATION
+                can_login: true
+                is_superuser: true
+                owns:
+                    schemas:
                         - information_schema
                         - pg_catalog
                         - public
+                    tables:
+                        - information_schema.*
+                        - pg_catalog.*
+                privileges:
+                    schemas:
+                        write:
+                            - information_schema
+                            - pg_catalog
+                            - public
 
-        test_user:
-            attributes:
-                - PASSWORD "test_password"
-            can_login: yes
-            is_superuser: yes
-        """)
+            test_user:
+                attributes:
+                    - PASSWORD "test_password"
+                can_login: yes
+                is_superuser: yes
+            """)
 
-    # Postgres 10 introduces several new roles that we have to account for
-    cursor.execute("SELECT substring(version from 'PostgreSQL ([0-9.]*) ') FROM version()")
-    pg_version = cursor.fetchone()[0]
-    if pg_version.startswith('10.'):
-        spec += dedent("""
-
+    # In version 10 and onwards Posgres only creates the `test_user` we specify
+    if pg_version >= 10:
+        spec = dedent("""
             pg_read_all_settings:
 
             pg_stat_scan_tables:
@@ -129,7 +131,46 @@ def base_spec(cursor):
                     - pg_read_all_settings
                     - pg_stat_scan_tables
                     - pg_read_all_stats
-            """)
+
+            postgres:
+                attributes:
+                    - BYPASSRLS
+                    - CREATEDB
+                    - CREATEROLE
+                    - REPLICATION
+                can_login: true
+                is_superuser: true
+                owns:
+                    schemas:
+                        - information_schema
+                        - pg_catalog
+                        - public
+                    tables:
+                        - information_schema.*
+                        - pg_catalog.*
+                privileges:
+                    schemas:
+                        write:
+                            - information_schema
+                            - pg_catalog
+                            - public
+
+            test_user:
+                attributes:
+                    - PASSWORD "test_password"
+                can_login: yes
+                is_superuser: yes
+        """)
+
+    # Postgres 11 introduces several new roles that we have to account for
+    if pg_version >= 11:
+        spec += dedent("""
+            pg_execute_server_program:
+
+            pg_read_server_files:
+
+            pg_write_server_files:
+        """)
 
     return spec
 

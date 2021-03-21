@@ -14,6 +14,8 @@ ROLES = tuple('role{}'.format(i) for i in range(4))
 TABLES = tuple('table{}'.format(i) for i in range(6))
 SEQUENCES = tuple('seq{}'.format(i) for i in range(6))
 DUMMY = 'foo'
+TEST_USER='test_user'
+POSTGRES_USER='postgres'
 
 
 @run_setup_sql(
@@ -385,15 +387,18 @@ def test_is_superuser(all_role_attributes, expected):
     ])
 def test_get_all_schemas_and_owners(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
+    pg_version = int(dbcontext.get_version_info().postgres_version.split('.')[0])
+
+    expected_owner = TEST_USER if pg_version >= 11 else POSTGRES_USER
     expected = {
         common.ObjectName(SCHEMAS[0]): ROLES[0],
         common.ObjectName(SCHEMAS[1]): ROLES[0],
         common.ObjectName(SCHEMAS[2]): ROLES[1],
         common.ObjectName(ROLES[1]): ROLES[1],
         # These already existed
-        common.ObjectName('public'): 'postgres',
-        common.ObjectName('information_schema'): 'postgres',
-        common.ObjectName('pg_catalog'): 'postgres',
+        common.ObjectName('public'): expected_owner,
+        common.ObjectName('information_schema'): expected_owner,
+        common.ObjectName('pg_catalog'): expected_owner,
     }
 
     actual = dbcontext.get_all_schemas_and_owners()
