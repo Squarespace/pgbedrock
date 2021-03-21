@@ -425,9 +425,10 @@ def test_get_all_memberships(cursor):
     dbcontext = context.DatabaseContext(cursor, verbose=True)
 
     expected = set([('role1', 'role0'), ('role2', 'role1')])
-    pg_version = dbcontext.get_version_info().postgres_version
+    pg_version = int(dbcontext.get_version_info().postgres_version.split('.')[0])
+
     # Postgres 10 introduces several new roles and memberships that we have to account for
-    if pg_version.startswith('10.'):
+    if pg_version >= 10:
         expected.update(set([
             ('pg_monitor', 'pg_stat_scan_tables'),
             ('pg_monitor', 'pg_read_all_stats'),
