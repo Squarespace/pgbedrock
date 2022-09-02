@@ -108,6 +108,7 @@ test27:
         --rm \
         -e WITHIN_DOCKER_FLAG=true \
         -e POSTGRES_PORT=5432 \
+        -e POSTGRES_VERSION=$(POSTGRES_VERSION) \
         -v $(shell pwd):/opt \
         --net=$(COMPOSED_NETWORK) \
         tester27
@@ -118,6 +119,7 @@ test36:
         --rm \
         -e WITHIN_DOCKER_FLAG=true \
         -e POSTGRES_PORT=5432 \
+        -e POSTGRES_VERSION=$(POSTGRES_VERSION) \
         -v $(shell pwd):/opt \
         --net=$(COMPOSED_NETWORK) \
         tester36
