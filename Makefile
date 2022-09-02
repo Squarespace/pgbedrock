@@ -1,4 +1,4 @@
-.PHONY: attach build build_tester clean coverage create_network docs psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version test27 test36 view_docs wait_for_postgres
+.PHONY: attach build build_tester clean coverage create_network docs psql release_pypi release_pypitest release_quay remove_network start_postgres stop_postgres test test_one_pg_version pytest view_docs wait_for_postgres
 
 SUPPORTED_PG_VERSIONS ?= 9.5.13 9.6.4 10.4
 # The default Postgres that will be used in individual targets
@@ -26,15 +26,10 @@ build: clean
         .
 
 build_tester:
-	@echo "Building the tester27 and tester36 docker images"
+	@echo "Building the tester docker image"
 	docker build . \
         -f tests/Dockerfile \
-        --build-arg PYTHON_VERSION=2.7 \
-        -t tester27
-	docker build . \
-        -f tests/Dockerfile \
-        --build-arg PYTHON_VERSION=3.6 \
-        -t tester36
+        -t tester
 
 clean:
 	@echo "Cleaning the repo"
@@ -94,7 +89,7 @@ stop_postgres:
 	@echo "Stopping postgres (if it is running)"
 	@-docker stop $(POSTGRES_HOST) || true
 
-test_one_pg_version: start_postgres wait_for_postgres test27 test36 remove_network clean
+test_one_pg_version: start_postgres wait_for_postgres pytest remove_network clean
 
 test: clean build_tester
 	@for pg_version in ${SUPPORTED_PG_VERSIONS}; do \
@@ -102,25 +97,15 @@ test: clean build_tester
         $(MAKE) test_one_pg_version POSTGRES_VERSION="$$pg_version"; \
     done
 
-test27:
-	@echo "Running pytest with Python 2.7"
+pytest:
+	@echo "Running pytest"
 	@docker run \
         --rm \
         -e WITHIN_DOCKER_FLAG=true \
         -e POSTGRES_PORT=5432 \
         -v $(shell pwd):/opt \
         --net=$(COMPOSED_NETWORK) \
-        tester27
-
-test36:
-	@echo "Running pytest with Python 3.6"
-	@docker run \
-        --rm \
-        -e WITHIN_DOCKER_FLAG=true \
-        -e POSTGRES_PORT=5432 \
-        -v $(shell pwd):/opt \
-        --net=$(COMPOSED_NETWORK) \
-        tester36
+        tester
 
 wait_for_postgres:
 	@echo 'Sleeping while postgres starts up';

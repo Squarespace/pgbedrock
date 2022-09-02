@@ -1,7 +1,6 @@
-# We only use Python for coveralls; both Python 2.7 and 3.6 are
-# tested but that is done within docker containers
+# We only use Python for coveralls
 language: python
-python: 3.6
+python: 3.7
 
 services:
     - docker
