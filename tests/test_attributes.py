@@ -382,14 +382,38 @@ def test_set_attribute_value_valid_until(roleconf):
     rolpassword=attr.create_md5_hash(ROLE1, 'supersecret'),
 ))
 @pytest.mark.parametrize('desired_value, expected', [
-    ('supersecret', True),
-    ('incorrect_password', False)])
-def test_is_same_password(roleconf, desired_value, expected):
+        ('supersecret', True),
+        ('md5c85aa4317b187e73a31e8ab775a10833', True),
+        ('incorrect_password', False),
+        ('SCRAM-SHA-256$4096:c3VwZXJzYWx0$E6lZT4K2olotsu19xYcF825iMPGdJQDYaklVS2mR6js=:Pe9DLNf8idnP59Q5l8Xmz3H+6LrTuiq//bcujQPGsRM=', False),
+    ]
+)
+def test_is_same_password_md5(roleconf, desired_value, expected):
     assert roleconf.is_same_password(desired_value) == expected
 
 
-def test_is_same_password_if_empty(roleconf):
-    assert roleconf.is_same_password(None) is True
+@nondefault_attributes(dict(
+    rolpassword=attr.create_scram_hash('supersecret', 'supersalt'.encode(), 4096),
+))
+@pytest.mark.parametrize('desired_value, expected', [
+        ('supersecret', True),
+        ('SCRAM-SHA-256$4096:c3VwZXJzYWx0$E6lZT4K2olotsu19xYcF825iMPGdJQDYaklVS2mR6js=:Pe9DLNf8idnP59Q5l8Xmz3H+6LrTuiq//bcujQPGsRM=', True),
+        ('incorrect_password', False),
+        ('md5c85aa4317b187e73a31e8ab775a10833', False),
+    ]
+)
+def test_is_same_password_scram(roleconf, desired_value, expected):
+    assert roleconf.is_same_password(desired_value) == expected
+
+@pytest.mark.parametrize('desired_value, expected', [
+        (None, True),
+        ('incorrect_password', False),
+        ('md5c85aa4317b187e73a31e8ab775a10833', False),
+        ('SCRAM-SHA-256$4096:c3VwZXJzYWx0$E6lZT4K2olotsu19xYcF825iMPGdJQDYaklVS2mR6js=:Pe9DLNf8idnP59Q5l8Xmz3H+6LrTuiq//bcujQPGsRM=', False),
+    ]
+)
+def test_is_same_password_if_empty(roleconf, desired_value, expected):
+    assert roleconf.is_same_password(desired_value) == expected
 
 
 @nondefault_attributes(dict(
