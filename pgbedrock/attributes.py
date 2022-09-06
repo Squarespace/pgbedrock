@@ -1,6 +1,8 @@
 import copy
 import datetime as dt
 import hashlib
+import hmac
+import base64
 import logging
 
 import click
@@ -86,6 +88,14 @@ def analyze_attributes(spec, cursor, verbose):
 def create_md5_hash(rolename, value):
     salted_input = (value + rolename).encode('utf-8')
     return 'md5' + hashlib.md5(salted_input).hexdigest()
+
+def create_scram_hash(password, salt, iterations):
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, iterations)
+    client_key = hmac.digest(digest, "Client Key".encode(), hashlib.sha256)
+    stored_key = base64.b64encode(hashlib.sha256(client_key).digest()).decode()
+    server_key = base64.b64encode(hmac.digest(digest, "Server Key".encode(), hashlib.sha256)).decode()
+
+    return "SCRAM-SHA-256${}:{}${}:{}".format(iterations, base64.b64encode(salt).decode(), stored_key, server_key)
 
 
 def is_valid_forever(val):
@@ -194,13 +204,47 @@ class AttributeAnalyzer(object):
         return value
 
     def is_same_password(self, value):
-        """ Convert the input value into a postgres rolname-salted md5 hash and compare
-        it with the currently stored hash """
-        if value is None:
-            return self.current_attributes.get('rolpassword') is None
+        """ Compare stored password hash to the new password.
 
-        md5_hash = create_md5_hash(self.rolename, value)
-        return self.current_attributes.get('rolpassword') == md5_hash
+        Returns ``True`` if both ``value`` and the stored password are ``None`` (empty)
+        **or** ``value`` is a plain text password its hash matches the stored password
+        hash **or** ``value`` is a hashed password and matches the stored password hash
+        type and value. ``False`` in any other case. """
+        current_value = self.current_attributes.get('rolpassword')
+
+        if value is None or current_value is None:
+            return value == current_value
+
+        if hmac.compare_digest(current_value, value):
+            return True
+
+        if current_value.startswith("SCRAM-SHA-256$"):
+            if value.startswith("md5"):
+                return False
+
+            if value.startswith("SCRAM-SHA-256$"):
+                return hmac.compare_digest(current_value, value)
+
+            hash_parts = current_value.split("$")
+
+            iterations, salt = hash_parts[1].split(":")
+            iterations = int(iterations)
+            salt = base64.b64decode(salt)
+
+            return hmac.compare_digest(current_value, create_scram_hash(value, salt, iterations))
+
+        if current_value.startswith("md5"):
+            if value.startswith("SCRAM-SHA-256$"):
+                return False
+
+            if value.startswith("md5"):
+                return hmac.compare_digest(current_value, value)
+
+            return hmac.compare_digest(current_value, create_md5_hash(self.rolename, value))
+
+        # There’s currently only two hash algorithm supported by Postgres (md5
+        # and SCRAM-SHA-256) so we should never reach this.
+        return False
 
     def role_exists(self):
         # If current_attributes is empty then the rolname wasn't in pg_authid, i.e. it doesn't exist
