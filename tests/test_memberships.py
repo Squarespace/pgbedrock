@@ -22,7 +22,7 @@ DUMMY = 'foo'
     attributes.Q_CREATE_ROLE.format(CURRENT_GROUP1),
     attributes.Q_CREATE_ROLE.format(DESIRED_GROUP1),
     attributes.Q_CREATE_ROLE.format(DESIRED_GROUP2),
-    attributes.Q_ALTER_ROLE.format(ROLE1, 'SUPERUSER'),
+    attributes.Q_ALTER_ROLE_WITH.format(ROLE1, 'SUPERUSER'),
     memb.Q_GRANT_MEMBERSHIP.format(CURRENT_GROUP1, ROLE3),
 ])
 def test_analyze_memberships(cursor):

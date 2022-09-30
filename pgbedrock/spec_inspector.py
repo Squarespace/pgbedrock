@@ -54,6 +54,8 @@ SPEC_SCHEMA_YAML = """
                 - NOLOGIN
                 - SUPERUSER
                 - NOSUPERUSER
+    configs:
+        type: dict
     member_of:
         type: list
         schema:

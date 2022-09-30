@@ -274,18 +274,18 @@ def test_add_ownerships(mockdbcontext):
 
     # role1's personal schema has an object in it
     attr.Q_CREATE_ROLE.format('role1'),
-    attr.Q_ALTER_ROLE.format('role1', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role1', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role1', 'role1'),
     Q_CREATE_TABLE.format('role1', 'role1', 'table0'),
 
     # role2's personal schema has no objects
     attr.Q_CREATE_ROLE.format('role2'),
-    attr.Q_ALTER_ROLE.format('role2', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role2', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role2', 'role2'),
 
     # role3's personal schema has several objects in it
     attr.Q_CREATE_ROLE.format('role3'),
-    attr.Q_ALTER_ROLE.format('role3', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role3', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role3', 'role3'),
     Q_CREATE_TABLE.format('role3', 'role3', 'table1'),
     Q_CREATE_TABLE.format('role3', 'role3', 'table2'),
@@ -312,7 +312,7 @@ def test_collapse_personal_schemas(cursor, objects, expected):
 
     # role1's personal schema has an object in it
     attr.Q_CREATE_ROLE.format('role1'),
-    attr.Q_ALTER_ROLE.format('role1', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role1', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role1', 'role1'),
     Q_CREATE_TABLE.format('role1', 'role1', 'table0'),
 
@@ -323,7 +323,7 @@ def test_collapse_personal_schemas(cursor, objects, expected):
 
     # role3's personal schema has several objects in it
     attr.Q_CREATE_ROLE.format('role3'),
-    attr.Q_ALTER_ROLE.format('role3', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role3', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role3', 'role3'),
     Q_CREATE_TABLE.format('role3', 'role3', 'table1'),
     Q_CREATE_TABLE.format('role3', 'role3', 'table2'),
@@ -358,14 +358,14 @@ def test_collapse_personal_schemas_no_personal_schemas_exist(cursor):
 
     # role1's personal schema has an object in it
     attr.Q_CREATE_ROLE.format('role1'),
-    attr.Q_ALTER_ROLE.format('role1', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role1', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role1', 'role1'),
     Q_CREATE_TABLE.format('role1', 'role1', 'table0'),
 
     # role2's personal schema has no objects. We could grant a default privilege here but all
     # that matters is that our input to the collapse_personal_schemas() function includes 'role2.*'
     attr.Q_CREATE_ROLE.format('role2'),
-    attr.Q_ALTER_ROLE.format('role2', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role2', 'LOGIN'),
     own.Q_CREATE_SCHEMA.format('role2', 'role2'),
 ])
 def test_collapse_personal_schemas_empty_schema_with_default_priv(cursor):
@@ -485,9 +485,9 @@ def test_determine_schema_privileges_only_read_exists(cursor):
     attr.Q_CREATE_ROLE.format('role0'),
     attr.Q_CREATE_ROLE.format('role1'),
     attr.Q_CREATE_ROLE.format('role2'),
-    attr.Q_ALTER_ROLE.format('role0', 'LOGIN'),
-    attr.Q_ALTER_ROLE.format('role1', 'LOGIN'),
-    attr.Q_ALTER_ROLE.format('role2', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role0', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role1', 'LOGIN'),
+    attr.Q_ALTER_ROLE_WITH.format('role2', 'LOGIN'),
 
     # Create three personal schemas
     own.Q_CREATE_SCHEMA.format('role0', 'role0'),

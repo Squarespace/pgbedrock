@@ -34,7 +34,7 @@ def roleconf(request, mockdbcontext):
     role_attributes.update(nondefault_attributes)
     mockdbcontext.get_role_attributes = lambda x: role_attributes
 
-    roleconf = attr.AttributeAnalyzer(rolename=ROLE1, spec_attributes={}, dbcontext=mockdbcontext)
+    roleconf = attr.AttributeAnalyzer(rolename=ROLE1, spec_attributes={}, spec_configs={}, dbcontext=mockdbcontext)
     return roleconf
 
 
@@ -70,7 +70,7 @@ def test_analyze_attributes_modifying_objects(capsys, cursor):
                 keyword = base_keyword if v is True else ('NO' + base_keyword)
                 # prefix = 'NO' if v is False else ''
                 # desired = prefix + k
-                stmt = attr.Q_ALTER_ROLE.format(role, keyword)
+                stmt = attr.Q_ALTER_ROLE_WITH.format(role, keyword)
             elif k == 'rolconnlimit':
                 stmt = attr.Q_ALTER_CONN_LIMIT.format(role, v, attr.DEFAULT_ATTRIBUTES[k])
             elif k == 'rolvaliduntil':
@@ -79,7 +79,7 @@ def test_analyze_attributes_modifying_objects(capsys, cursor):
             expected.add(stmt)
 
     expected.add(attr.Q_CREATE_ROLE.format(ROLE2))
-    expected.add(attr.Q_ALTER_ROLE.format(ROLE2, 'SUPERUSER'))
+    expected.add(attr.Q_ALTER_ROLE_WITH.format(ROLE2, 'SUPERUSER'))
     expected.add(attr.Q_CREATE_ROLE.format(ROLE3))
 
     actual, password_changed = attr.analyze_attributes(spec, cursor, verbose=False)
@@ -92,7 +92,7 @@ def test_analyze_attributes_modifying_objects(capsys, cursor):
 def test_analyze_nonexistent_role_with_default_attributes(mockdbcontext):
     mockdbcontext.get_role_attributes = lambda x: dict()
     # Analyze the role with default attributes
-    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes={}, dbcontext=mockdbcontext)
+    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes={}, spec_configs={}, dbcontext=mockdbcontext)
     roleconf.analyze()
 
     assert roleconf.sql_to_run == [
@@ -108,16 +108,16 @@ def test_analyze_nonexistent_role_with_non_default_attributes(mockdbcontext):
 
     # Analyze the role with non-default attributes
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=spec_attributes,
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
     roleconf.analyze()
 
     expected = set([
         attr.Q_CREATE_ROLE.format(ROLE1),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'LOGIN'),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'SUPERUSER'),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'CREATEDB'),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'CREATEROLE'),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'REPLICATION'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'LOGIN'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'SUPERUSER'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'CREATEDB'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'CREATEROLE'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'REPLICATION'),
         attr.Q_ALTER_CONN_LIMIT.format(ROLE1, '30', '-1'),
         attr.Q_ALTER_VALID_UNTIL.format(ROLE1, '2016-08-04', 'None'),
     ])
@@ -140,14 +140,14 @@ def test_analyze_existing_role_non_default_attributes(mockdbcontext):
     spec_attributes.extend(['LOGIN', 'SUPERUSER'])
 
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=spec_attributes,
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
 
     roleconf.analyze()
 
     expected = set([
-        attr.Q_ALTER_ROLE.format(ROLE1, 'SUPERUSER'),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'CREATEDB'),
-        attr.Q_ALTER_ROLE.format(ROLE1, 'CREATEROLE'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'SUPERUSER'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'CREATEDB'),
+        attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'CREATEROLE'),
         attr.Q_ALTER_CONN_LIMIT.format(ROLE1, '30', '27'),
         attr.Q_ALTER_VALID_UNTIL.format(ROLE1, '2016-08-04', 'None'),
     ])
@@ -166,7 +166,7 @@ def test_role_exists_true(roleconf):
 
 def test_role_exists_false(mockdbcontext, roleconf):
     mockdbcontext.get_role_attributes = lambda x: dict()
-    roleconf = attr.AttributeAnalyzer(DUMMY, spec_attributes=DUMMY, dbcontext=mockdbcontext)
+    roleconf = attr.AttributeAnalyzer(DUMMY, spec_attributes=DUMMY, spec_configs={}, dbcontext=mockdbcontext)
     assert not roleconf.role_exists()
 
 
@@ -184,7 +184,7 @@ def test_converted_attributes_defaults(roleconf):
 @pytest.mark.parametrize('bogus_attribute', [('INVALID'), ('NOINVALID')])
 def test_converted_attributes_invalid_attribute(capsys, mockdbcontext, bogus_attribute):
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=[bogus_attribute],
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
 
     with pytest.raises(SystemExit):
         roleconf.converted_attributes()
@@ -195,14 +195,14 @@ def test_converted_attributes_connection_limit(mockdbcontext):
     """ Make sure converted_attributes parses a connection limit attribute successfully, i.e.
     that it splits the string and converts the second part to an int """
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=['CONNECTION LIMIT 11'],
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
     attributes = roleconf.converted_attributes()
     assert attributes['rolconnlimit'] == 11
 
 
 def test_converted_attributes_valid_until(mockdbcontext):
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=["VALID UNTIL '2018-08-08'"],
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
     attributes = roleconf.converted_attributes()
     assert attributes['rolvaliduntil'] == "'2018-08-08'"
 
@@ -210,7 +210,7 @@ def test_converted_attributes_valid_until(mockdbcontext):
 def test_converted_attributes_password(mockdbcontext):
     password_val = 'supeRSecret'
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=["PASSWORD '{}'".format(password_val)],
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
     attributes = roleconf.converted_attributes()
     assert attributes['rolpassword'] == password_val
 
@@ -219,7 +219,7 @@ def test_converted_attributes_password(mockdbcontext):
 def test_converted_attributes_password_error_on_quotes(capsys, mockdbcontext, password):
     with pytest.raises(SystemExit):
         roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=["PASSWORD {}".format(password)],
-                                          dbcontext=mockdbcontext)
+                                          spec_configs={}, dbcontext=mockdbcontext)
         roleconf.converted_attributes()
 
     expected_err_msg = attr.UNSUPPORTED_CHAR_MSG.format(ROLE1) + '\n'
@@ -229,7 +229,7 @@ def test_converted_attributes_password_error_on_quotes(capsys, mockdbcontext, pa
 def test_converted_attributes_boolean_attribute(mockdbcontext):
     set_attributes = ['LOGIN', 'NOINHERIT', 'CREATEROLE', 'BYPASSRLS']
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=set_attributes,
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
     converted_attributes = roleconf.converted_attributes()
 
     for opt in set_attributes:
@@ -245,7 +245,7 @@ def test_coalesce_attributes(mockdbcontext):
     mockdbcontext.get_role_attributes = lambda x: copy.deepcopy(attr.DEFAULT_ATTRIBUTES)
     set_attributes = ['BYPASSRLS', 'CREATEDB', 'NOINHERIT', 'REPLICATION']
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=set_attributes,
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
 
     actual = roleconf.coalesce_attributes()
     expected = copy.deepcopy(attr.DEFAULT_ATTRIBUTES)
@@ -270,12 +270,12 @@ def test_set_all_attributes(mockdbcontext):
     mockdbcontext.get_role_attributes = lambda x: copy.deepcopy(attr.DEFAULT_ATTRIBUTES)
     set_attributes = ['BYPASSRLS', 'CREATEDB', 'CREATEROLE', 'REPLICATION']
     roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=set_attributes,
-                                      dbcontext=mockdbcontext)
+                                      spec_configs={}, dbcontext=mockdbcontext)
     attributes = roleconf.coalesce_attributes()
     roleconf.set_all_attributes(attributes)
 
     actual = set(roleconf.sql_to_run)
-    expected = {attr.Q_ALTER_ROLE.format(ROLE1, opt) for opt in set_attributes}
+    expected = {attr.Q_ALTER_ROLE_WITH.format(ROLE1, opt) for opt in set_attributes}
     assert actual == expected
 
 
@@ -290,7 +290,7 @@ def test_set_all_attributes_change_skips_same_password(mockdbcontext, password):
     mockdbcontext.get_role_attributes = lambda x: role_attributes
 
     attributes = ['PASSWORD {}'.format(password)]
-    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=attributes, dbcontext=mockdbcontext)
+    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=attributes, spec_configs={}, dbcontext=mockdbcontext)
     attributes = roleconf.coalesce_attributes()
     roleconf.set_all_attributes(attributes)
     assert roleconf.sql_to_run == []
@@ -317,7 +317,7 @@ def test_get_attribute_value(mockdbcontext, optname, optval):
     )
     mockdbcontext.get_role_attributes = lambda x: role_attributes
 
-    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=[], dbcontext=mockdbcontext)
+    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=[], spec_configs={}, dbcontext=mockdbcontext)
     assert roleconf.get_attribute_value(optname) == optval
 
 
@@ -351,7 +351,7 @@ def test_set_attribute_value(roleconf, optname, optval):
         base_keyword = attr.COLUMN_NAME_TO_KEYWORD[optname]
         # prepend 'NO' if desired_value is False
         keyword = base_keyword if optval is True else ('NO' + base_keyword)
-        expected = [attr.Q_ALTER_ROLE.format(ROLE1, keyword)]
+        expected = [attr.Q_ALTER_ROLE_WITH.format(ROLE1, keyword)]
 
     actual = roleconf.sql_to_run
     assert actual == expected
@@ -361,8 +361,8 @@ def test_set_attribute_value_sql_to_run(roleconf):
     assert len(roleconf.sql_to_run) == 0
     roleconf.set_attribute_value(attribute='rolcanlogin', desired_value=True, current_value='_')
     roleconf.set_attribute_value(attribute='rolsuper', desired_value=True, current_value='_')
-    assert roleconf.sql_to_run == [attr.Q_ALTER_ROLE.format(ROLE1, 'LOGIN'),
-                                   attr.Q_ALTER_ROLE.format(ROLE1, 'SUPERUSER')]
+    assert roleconf.sql_to_run == [attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'LOGIN'),
+                                   attr.Q_ALTER_ROLE_WITH.format(ROLE1, 'SUPERUSER')]
 
 
 def test_set_attribute_value_valid_until(roleconf):
@@ -424,3 +424,33 @@ def test_set_password_log_message_is_masked(capsys, cursor):
     _, password_all_sql_to_run = attr.analyze_attributes(spec, cursor, verbose=False)
 
     assert password_all_sql_to_run == [attr.Q_ALTER_PASSWORD.format(ROLE1, new_password)]
+
+
+def test_get_config_value(mockdbcontext):
+    role_configs = {
+        'statement_timeout': 42
+    }
+    mockdbcontext.get_role_configs = lambda x: role_configs
+
+    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=[], spec_configs={}, dbcontext=mockdbcontext)
+    for k, v in role_configs.items():
+        assert roleconf.get_config_value(k) == v
+
+
+def test_set_all_configs(mockdbcontext):
+    mockdbcontext.get_role_configs = lambda x: {
+        'existing_extra': 'test',
+    }
+
+    spec_configs = {
+        'statement_timeout': 42,
+        'idle_in_transaction_session_timeout': 180,
+    }
+
+    roleconf = attr.AttributeAnalyzer(ROLE1, spec_attributes=[], spec_configs=spec_configs, dbcontext=mockdbcontext)
+    roleconf.set_all_configs(spec_configs)
+
+    actual = set(roleconf.sql_to_run)
+    expected = set(attr.Q_ALTER_ROLE_SET.format(ROLE1, k, v, '') for k, v in spec_configs.items())
+    expected.add(attr.Q_ALTER_ROLE_RESET.format(ROLE1, 'existing_extra', 'test'))
+    assert actual == expected
