@@ -296,7 +296,7 @@ def test_get_all_object_attributes(cursor):
     [attributes.Q_CREATE_ROLE.format(r) for r in ROLES[:3]] +
 
     # Grant login permission to 2 of the roles
-    [attributes.Q_ALTER_ROLE.format(r, 'LOGIN') for r in ROLES[1:3]] +
+    [attributes.Q_ALTER_ROLE_WITH.format(r, 'LOGIN') for r in ROLES[1:3]] +
 
     # Create personal schemas (i.e. schemas named identically to their owner)
     [ownerships.Q_CREATE_SCHEMA.format(r, r) for r in ROLES[:3]]

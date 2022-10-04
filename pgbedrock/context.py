@@ -124,6 +124,8 @@ Q_GET_ALL_ROLE_ATTRIBUTES = """
     ;
     """
 
+Q_GET_ALL_ROLE_CONFIGS = "SELECT usename, useconfig FROM pg_shadow;"
+
 Q_GET_ALL_MEMBERSHIPS = """
     SELECT
         auth_member.rolname AS member,
@@ -249,6 +251,7 @@ class DatabaseContext(object):
         'get_all_current_nondefaults',
         'get_all_object_attributes',
         'get_all_role_attributes',
+        'get_all_role_configs',
         'get_all_memberships',
         'get_all_nonschema_objects_and_owners',
         'get_all_personal_schemas',
@@ -426,6 +429,23 @@ class DatabaseContext(object):
     def is_superuser(self, rolename):
         role_attributes = self.get_role_attributes(rolename)
         return role_attributes.get('rolsuper', False)
+
+    def get_all_role_configs(self):
+        """ Return a dict of {rolname: {config_name: value}} from pg_shadow"""
+        common.run_query(self.cursor, self.verbose, Q_GET_ALL_ROLE_CONFIGS)
+        role_configs = {}
+        for row in self.cursor.fetchall():
+            role_configs[row['usename']] = {}
+
+            for config in row['useconfig'] or []:
+                k, v = config.split('=')
+                role_configs[row['usename']][k] = v
+
+        return role_configs
+
+    def get_role_configs(self, rolename):
+        all_role_configs = self.get_all_role_configs()
+        return all_role_configs.get(rolename, dict())
 
     def get_all_raw_object_attributes(self):
         """

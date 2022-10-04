@@ -25,6 +25,8 @@ As an example, the definition for the ``jdoe`` role in the spec might look like 
         is_superuser: no
         attributes:
             - PASSWORD "{{ env['JDOE_PASSWORD'] }}"
+        configs:
+          statement_timeout: 42s
         member_of:
             - analyst
         owns:
@@ -58,6 +60,7 @@ When pgbedrock is run, it would make sure that:
     * ``jdoe`` is not a superuser
     * ``jdoe``'s password is the same as what is in the ``$JDOE_PASSWORD`` environment variable
     * All other role attributes for ``jdoe`` are the Postgres defaults (as defined by `pg_authid`_).
+    * ``jdoe``’s session config ``statement_timeout`` is set to ``42s``
     * ``jdoe`` is a member of the ``analyst`` role
     * ``jdoe`` is a member of no other roles
     * ``jdoe`` owns the ``finance_reports`` schema

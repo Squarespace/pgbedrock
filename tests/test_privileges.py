@@ -232,7 +232,7 @@ def test_analyze_privileges(cursor):
 
 @run_setup_sql([
     attributes.Q_CREATE_ROLE.format(ROLES[0]),
-    attributes.Q_ALTER_ROLE.format(ROLES[0], 'SUPERUSER')
+    attributes.Q_ALTER_ROLE_WITH.format(ROLES[0], 'SUPERUSER')
 ])
 def test_analyze_privileges_skips_superuser(cursor):
     desired_spec = yaml.safe_load("""

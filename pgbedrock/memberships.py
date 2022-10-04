@@ -24,9 +24,9 @@ def analyze_memberships(spec, cursor, verbose):
     with click.progressbar(spec.items(), label='Analyzing memberships:', bar_template=bar_template,
                            show_eta=False, item_show_func=common.item_show_func) as all_roles:
         all_sql_to_run = []
-        for rolename, spec_config in all_roles:
-            spec_config = spec_config or {}
-            spec_memberships = set(spec_config.get('member_of', []))
+        for rolename, spec_settings in all_roles:
+            spec_settings = spec_settings or {}
+            spec_memberships = set(spec_settings.get('member_of', []))
             sql_to_run = MembershipAnalyzer(rolename, spec_memberships, dbcontext).analyze()
             all_sql_to_run += sql_to_run
 
