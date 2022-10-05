@@ -1,3 +1,5 @@
+from os import getenv
+
 import pytest
 
 from conftest import run_setup_sql
@@ -535,3 +537,47 @@ def test_get_version_info(cursor):
     cursor.close()
     actual_again = dbcontext.get_version_info()
     assert actual_again == actual
+
+
+
+
+@pytest.mark.skipif((int(getenv('POSTGRES_VERSION', '10.4').split('.')[0]) <= 9), reason="Parition not supported until PG10")
+@run_setup_sql(
+    # Create a role
+    [attributes.Q_CREATE_ROLE.format(ROLES[0])] +
+    [
+        # Create schema; Role0 owns the schema but no objects
+        ownerships.Q_CREATE_SCHEMA.format(SCHEMAS[0], ROLES[0]),
+    ] +
+    # Let the role create objects in the schema
+    [privs.Q_GRANT_NONDEFAULT.format('CREATE', 'SCHEMA', SCHEMAS[0], ROLES[0])] +
+    [
+        # Create a partitioned table
+        'SET ROLE {}; CREATE TABLE {}.{} (num int) PARTITION BY RANGE (num); RESET ROLE;'.format(ROLES[0], SCHEMAS[0], TABLES[0]),
+    ])
+def test_get_partitioned_table(cursor):
+    dbcontext = context.DatabaseContext(cursor, verbose=True)
+    expected = {
+        'tables': {
+            SCHEMAS[0]: {
+                common.ObjectName(SCHEMAS[0], TABLES[0]): {'owner': ROLES[0], 'is_dependent': False},
+            }
+        },
+        'schemas': {
+            SCHEMAS[0]: {
+                common.ObjectName(SCHEMAS[0]): {'owner': ROLES[0], 'is_dependent': False},
+            },
+            'public': {
+                'public': {'owner': 'postgres', 'is_dependent': False},
+            }
+        }
+    }
+
+    actual = dbcontext.get_all_object_attributes()
+
+    # We do this to avoid having to look at / filter out entries from
+    # information_schema or pg_catalog
+    for key in expected.keys():
+        expected_entries = expected[key][SCHEMAS[0]]
+        actual_entries = actual[key][SCHEMAS[0]]
+        assert expected_entries == actual_entries

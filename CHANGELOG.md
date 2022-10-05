@@ -7,6 +7,11 @@ and this project tries to adhere to [Semantic Versioning](http://semver.org/spec
 ## [Unreleased]
 _this space intentionally left blank_
 
+## [0.4.3] - 2022-09-01
+
+### In Code
+- fix Q_GET_ALL_RAW_OBJECT_ATTRIBUTES in context.py to also recognize partitioned tables (@FlipEnergy)
+
 ## [0.4.2] - 2019-12-13
 ### In Code
 - Fixes for new "except" feature introduced in 0.4.0 ( @jholbrook-sqsp )
