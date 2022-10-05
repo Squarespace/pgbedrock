@@ -54,6 +54,7 @@ Q_GET_ALL_CURRENT_NONDEFAULTS = """
                ('v', 'tables'),
                ('m', 'tables'),
                ('f', 'tables'),
+               ('p', 'tables'),
                ('S', 'sequences')
     ), tables_and_sequences AS (
         SELECT
